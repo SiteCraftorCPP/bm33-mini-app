@@ -17,6 +17,8 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.integrations.google_sheets import GoogleSheets
 from app.models import Order
+from app.catalog.service import sync_catalog
+from app.integrations.google_sheets import SheetsError
 from app.orders.stock import restore_accepted_order_stock
 
 async def main():
@@ -31,11 +33,19 @@ async def main():
                 continue
             print("ORDER", order_id, order.status)
             if order.status == "accepted":
-                await restore_accepted_order_stock(db, sheets, order_id)
-                db.commit()
+                try:
+                    await restore_accepted_order_stock(db, sheets, order_id)
+                    db.commit()
+                except SheetsError as exc:
+                    print("RESTORE_SKIP", order_id, exc)
+        imported = await sheets.fetch_catalog(force=True)
+        sync_catalog(db, imported)
         db.execute(text("DELETE FROM order_items"))
         db.execute(text("DELETE FROM orders"))
-        db.execute(text("DELETE FROM sqlite_sequence WHERE name IN ('orders', 'order_items')"))
+        try:
+            db.execute(text("DELETE FROM sqlite_sequence WHERE name IN ('orders', 'order_items')"))
+        except Exception:
+            pass
         db.commit()
     print("RESET_OK")
 
