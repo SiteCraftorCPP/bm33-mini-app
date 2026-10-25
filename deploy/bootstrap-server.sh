@@ -11,6 +11,7 @@ apt-get update -qq
 apt-get install -y -qq git nginx certbot python3-certbot-nginx python3-venv python3-pip curl
 
 mkdir -p /etc/ches-hockey /var/lib/ches-hockey /var/www/certbot
+chown root:www-data /etc/ches-hockey
 chmod 750 /etc/ches-hockey
 
 if [[ ! -d "$APP_DIR/.git" ]]; then

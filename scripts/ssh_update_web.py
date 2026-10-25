@@ -11,6 +11,7 @@ host = re.search(r"хост:\s*([0-9.]+)\s*/\s*(\S+)", text, re.I)
 
 cmds = """
 set -e
+git config --global --add safe.directory /opt/bm33-mini-app
 cd /opt/bm33-mini-app
 git fetch origin
 git reset --hard origin/main

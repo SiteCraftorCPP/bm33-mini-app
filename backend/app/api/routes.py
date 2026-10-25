@@ -313,9 +313,20 @@ async def admin_catalog_sync(
     user: TelegramIdentity = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict:
+    sheets = sheets_from(request)
+    if not sheets.can_write:
+        raise HTTPException(
+            status_code=503,
+            detail="Нет доступа к Google service account на сервере. Проверьте права /etc/ches-hockey.",
+        )
     try:
-        imported = await sheets_from(request).fetch_catalog(force=True)
+        imported = await sheets.fetch_catalog(force=True)
     except SheetsError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Сервер не может прочитать ключ Google Sheets (права файла).",
+        ) from exc
     restocked = sync_catalog(db, imported)
     return {"ok": True, "products": len(imported), "restocked": len(restocked)}
