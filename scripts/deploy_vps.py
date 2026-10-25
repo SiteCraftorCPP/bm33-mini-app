@@ -68,9 +68,9 @@ SHEETS_SYNC_INTERVAL_SECONDS=60
         out = stdout.read().decode(errors="replace")
         err = stderr.read().decode(errors="replace")
         if out.strip():
-            print(out[-4000:])
+            print(out[-4000:].encode("ascii", errors="replace").decode("ascii"))
         if exit_code != 0:
-            print(err[-2000:], file=sys.stderr)
+            print(err[-2000:].encode("ascii", errors="replace").decode("ascii"), file=sys.stderr)
             raise SystemExit(f"Command failed ({exit_code}): {cmd}")
 
     run("apt-get update -qq && apt-get install -y -qq git nginx certbot python3-certbot-nginx python3-venv curl")

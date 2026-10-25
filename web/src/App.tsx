@@ -743,7 +743,7 @@ function AdminView({
 
   return (
     <section className="page admin-page">
-      <div className="page-title"><span className="eyebrow">ADMIN</span><h1>Управление</h1></div>
+      <div className="page-title"><h1>Админ</h1></div>
       <div className="admin-actions">
         <button className="primary-button" disabled={offline || syncing} onClick={sync}>
           <RefreshCw size={18} /> {syncing ? 'Синхронизация…' : 'Обновить из Google Sheets'}

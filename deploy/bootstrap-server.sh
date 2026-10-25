@@ -58,6 +58,7 @@ fi
 
 if [[ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]]; then
   cp deploy/nginx-ches-hockey.conf /etc/nginx/sites-available/ches-hockey
+  ln -sf /etc/nginx/sites-available/ches-hockey /etc/nginx/sites-enabled/ches-hockey
 else
   echo "SSL cert not ready — nginx stays on HTTP-only config"
 fi

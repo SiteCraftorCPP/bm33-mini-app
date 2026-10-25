@@ -307,7 +307,14 @@ main {
 .category-rail {
   margin: 0 -18px;
   padding: 0 18px 8px;
+  padding-inline-end: 28px;
   scroll-snap-type: x mandatory;
+  scroll-padding-inline: 18px 28px;
+}
+
+.category-rail::after {
+  flex: 0 0 10px;
+  content: '';
 }
 
 .category-rail::-webkit-scrollbar,
@@ -1774,8 +1781,13 @@ main {
   .category-rail {
     margin-right: -28px;
     margin-left: -28px;
-    padding-right: 28px;
+    padding-right: 36px;
     padding-left: 28px;
+    scroll-padding-inline: 28px 36px;
+  }
+
+  .category-rail::after {
+    flex: 0 0 16px;
   }
 
   .product-grid {
