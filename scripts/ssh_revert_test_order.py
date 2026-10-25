@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Restore stock for a test order and reset status to new (run on VPS with env)."""
-import asyncio
+import base64
 import re
 import sys
 from pathlib import Path
@@ -15,7 +15,7 @@ import asyncio
 import sys
 sys.path.insert(0, "/opt/bm33-mini-app/backend")
 from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.integrations.google_sheets import GoogleSheets
 from app.models import Order, OrderItem, Variant
@@ -51,9 +51,10 @@ host = re.search(r"хост:\s*([0-9.]+)\s*/\s*(\S+)", text, re.I)
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 client.connect(host.group(1), username="root", password=host.group(2), timeout=30)
+b64 = base64.b64encode(remote_py.encode()).decode()
 cmd = (
     "set -a && source /etc/ches-hockey/env && set +a && "
-    f"/opt/bm33-mini-app/.venv/bin/python -c {repr(remote_py)}"
+    f"echo {b64} | base64 -d | /opt/bm33-mini-app/.venv/bin/python"
 )
 _, stdout, stderr = client.exec_command(cmd, timeout=120)
 stdout.channel.recv_exit_status()
