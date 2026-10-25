@@ -102,3 +102,45 @@ async def fulfill_accepted_order(
 
     for variant_id, quantity in quantities.items():
         by_id[variant_id].stock -= quantity
+
+
+async def restore_accepted_order_stock(
+    db: Session,
+    sheets: GoogleSheets,
+    order_id: int,
+    *,
+    demo: bool = False,
+) -> None:
+    """Return stock to sheet/DB after a mistaken accept (admin tooling)."""
+    order = db.scalar(
+        select(Order)
+        .where(Order.id == order_id)
+        .options(selectinload(Order.items))
+    )
+    if order is None:
+        raise SheetsError("Заказ не найден")
+
+    quantities = Counter[str]()
+    for item in order.items:
+        quantities[item.variant_id] += item.quantity
+
+    variants = db.scalars(
+        select(Variant).where(Variant.id.in_(list(quantities))).with_for_update()
+    ).all()
+    by_id = {variant.id: variant for variant in variants}
+
+    sheet_variants = [by_id[vid] for vid in quantities if by_id[vid].sheet_gid != "demo"]
+    updates = [
+        _stock_update(
+            variant,
+            variant.stock,
+            variant.stock + quantities[variant.id],
+        )
+        for variant in sheet_variants
+    ]
+
+    if not demo and updates:
+        await sheets.update_stocks(updates)
+
+    for variant_id, quantity in quantities.items():
+        by_id[variant_id].stock += quantity

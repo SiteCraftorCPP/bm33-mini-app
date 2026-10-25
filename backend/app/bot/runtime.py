@@ -16,6 +16,7 @@ from aiogram.types import (
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.bot.order_messages import format_order_text, order_action_markup, user_accepted_markup
 from app.config import Settings
 from app.db import SessionLocal
 from app.integrations.google_sheets import GoogleSheets, SheetsError
@@ -59,18 +60,18 @@ class TelegramService:
                 markup = self._manager_link_markup()
                 if markup:
                     await message.answer(
-                        "💬 Напишите менеджеру в Telegram — ответит в личных сообщениях.",
+                        "💬 Напишите менеджеру в Telegram - ответит в личных сообщениях.",
                         reply_markup=markup,
                     )
                 else:
                     await message.answer(
-                        "Контакт менеджера пока не настроен. 🏒 Оформите заказ в магазине — мы свяжемся с вами.",
+                        "Контакт менеджера пока не настроен. 🏒 Оформите заказ в магазине - мы свяжемся с вами.",
                         reply_markup=self._home_keyboard(),
                     )
                 return
             await message.answer(
                 "🏒 Добро пожаловать в Ches Hockey!\n\n"
-                "🧤 Экипировка в наличии — быстрое оформление через менеджера ⚡",
+                "🧤 Экипировка в наличии - быстрое оформление через менеджера",
                 reply_markup=self._start_keyboard(),
             )
 
@@ -117,26 +118,48 @@ class TelegramService:
                     return
                 order.status = new_status
                 db.commit()
+                order = db.scalar(
+                    select(Order)
+                    .where(Order.id == order_id)
+                    .options(selectinload(Order.items))
+                )
+
             await call.answer(labels[new_status])
-            if self.bot:
+            if self.bot and order:
                 try:
-                    text = f"Статус заказа №{parts[1]}: {labels[new_status].lower()}."
-                    markup = None
-                    if new_status == "accepted":
-                        order_url = f"{self.settings.public_webapp_url.rstrip('/')}?order={parts[1]}"
-                        markup = InlineKeyboardMarkup(
-                            inline_keyboard=[
-                                [
-                                    InlineKeyboardButton(
-                                        text="Открыть заказ",
-                                        web_app=WebAppInfo(url=order_url),
-                                    )
-                                ]
-                            ]
-                        )
-                    await self.bot.send_message(user_id, text, reply_markup=markup)
+                    card_text = format_order_text(order)
+                    markup = order_action_markup(
+                        order_id,
+                        order.status,
+                        self.settings.public_webapp_url,
+                    )
+                    if call.message:
+                        await call.message.edit_text(card_text, reply_markup=markup)
                 except Exception:
-                    self.log.exception("order status notification failed")
+                    self.log.exception("order card edit failed")
+
+                admin_name = call.from_user.full_name or "Менеджер"
+                admin_note = f"Заказ №{order_id}: {labels[new_status].lower()} ({admin_name})"
+                for chat_id in self.target_chat_ids:
+                    if call.message and call.message.chat.id == chat_id:
+                        continue
+                    try:
+                        await self.bot.send_message(chat_id, admin_note)
+                    except Exception:
+                        self.log.exception("order status admin notify failed", extra={"chat_id": chat_id})
+
+                if new_status == "accepted":
+                    try:
+                        await self.bot.send_message(
+                            user_id,
+                            f"Заказ №{order_id} принят. Спасибо за заказ!",
+                            reply_markup=user_accepted_markup(
+                                order_id,
+                                self.settings.public_webapp_url,
+                            ),
+                        )
+                    except Exception:
+                        self.log.exception("order status user notify failed")
 
     async def start(self) -> None:
         if self.bot is None:
@@ -171,32 +194,11 @@ class TelegramService:
             )
             if order is None:
                 return
-            lines = [
-                f"Новый заказ №{order.id}",
-                "",
-                *[
-                    f"• {item.product_name} — {item.variant_label} × {item.quantity} "
-                    f"({item.unit_price * item.quantity:,} ₽)".replace(",", " ")
-                    for item in order.items
-                ],
-                "",
-                f"Итого: {order.total:,} ₽".replace(",", " "),
-                f"Клиент: {order.customer_name}",
-                f"Телефон: {order.phone}",
-                f"Город: {order.city or 'не указан'}",
-                f"Получение: {order.delivery or 'уточнить'}",
-                f"Telegram: @{order.telegram_username}" if order.telegram_username else f"Telegram ID: {order.telegram_user_id}",
-            ]
-            if order.comment:
-                lines.append(f"Комментарий: {order.comment}")
-            text = "\n".join(lines)
-            markup = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(text="Принять", callback_data=f"order:{order.id}:accepted"),
-                        InlineKeyboardButton(text="Связались", callback_data=f"order:{order.id}:contacted"),
-                    ]
-                ]
+            text = format_order_text(order)
+            markup = order_action_markup(
+                order_id,
+                order.status,
+                self.settings.public_webapp_url,
             )
         for chat_id in self.target_chat_ids:
             await self.bot.send_message(chat_id, text, reply_markup=markup)
