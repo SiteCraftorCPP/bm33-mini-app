@@ -766,16 +766,21 @@ function AdminView({
         <h2>Последние заказы</h2>
         {orders.map((order) => (
           <article className="admin-order-line" key={order.id}>
-            <div>
-              <strong>№{order.id}</strong>
-              <span className={`status-pill status-${order.status}`}>{order.statusLabel}</span>
+            <div className="admin-order-line__top">
+              <div className="admin-order-line__id">
+                <strong>№{order.id}</strong>
+                <span className={`status-pill status-${order.status}`}>{order.statusLabel}</span>
+              </div>
+              <strong className="admin-order-line__total">{money.format(order.total)} ₽</strong>
             </div>
-            <div>
-              <small>{order.customerName || '—'} · {order.phone || '—'}</small>
-              <strong>{money.format(order.total)} ₽</strong>
-            </div>
+            <small className="admin-order-line__meta">
+              {order.customerName || '—'} · {order.phone || '—'}
+            </small>
           </article>
         ))}
+        {!orders.length && !offline && (
+          <p className="admin-orders-empty">Заказов пока нет</p>
+        )}
       </div>
     </section>
   )

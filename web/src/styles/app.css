@@ -1916,15 +1916,42 @@ main {
 }
 
 .admin-order-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  gap: 6px;
   padding: 12px 0;
   border-bottom: 1px solid #e8edf3;
 }
 
-.admin-order-line small {
+.admin-order-line__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-order-line__id {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-order-line__total {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.admin-order-line__meta {
   display: block;
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+
+.admin-orders-empty {
+  margin: 0;
   color: var(--muted);
   font-size: var(--text-caption);
 }
