@@ -19,9 +19,14 @@ cd web
 npm ci
 VITE_BOT_USERNAME=chesalin_hockey_bot npm run build
 systemctl reload nginx
+chown root:www-data /etc/ches-hockey
+chmod 750 /etc/ches-hockey
+chown root:www-data /etc/ches-hockey/env /etc/ches-hockey/google-service-account.json
+chmod 640 /etc/ches-hockey/env /etc/ches-hockey/google-service-account.json
 systemctl restart ches-hockey-api
-sleep 2
+sleep 3
 systemctl is-active ches-hockey-api
+curl -sS http://127.0.0.1:8000/api/health
 echo OK
 """
 
