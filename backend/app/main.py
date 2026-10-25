@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
     app.state.settings = get_settings()
     app.state.logger = log
     app.state.sheets = GoogleSheets(app.state.settings)
-    app.state.telegram = TelegramService(app.state.settings)
+    app.state.telegram = TelegramService(app.state.settings, app.state.sheets)
     app.state.has_catalog = lambda db: db.query(Product.id).first() is not None
 
     await refresh_catalog(app)

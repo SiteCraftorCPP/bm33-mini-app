@@ -11,7 +11,8 @@ from app.api.auth import TelegramIdentity, current_user
 from app.api.routes import router
 from app.db import Base, get_db
 from app.integrations.google_sheets import SheetsError, StockUpdate
-from app.models import Product, Variant
+from app.models import Order, Product, Variant
+from app.orders.stock import fulfill_accepted_order
 
 
 class FakeTelegram:
@@ -91,7 +92,7 @@ def order_payload(quantity: int) -> dict:
     }
 
 
-def test_order_decrements_stock_and_notifies(api) -> None:
+def test_order_reserves_stock_without_sheet_write(api) -> None:
     app, sessions = api
     with TestClient(app) as client:
         response = client.post("/api/orders", json=order_payload(2))
@@ -99,12 +100,28 @@ def test_order_decrements_stock_and_notifies(api) -> None:
     assert response.status_code == 201
     assert response.json()["total"] == 15000
     assert app.state.telegram.orders == [response.json()["id"]]
+    assert app.state.sheets.updates == []
+    with sessions() as db:
+        assert db.get(Variant, "variant-1").stock == 2
+
+
+@pytest.mark.asyncio
+async def test_accept_fulfills_sheet_and_local_stock(api) -> None:
+    app, sessions = api
+    with TestClient(app) as client:
+        response = client.post("/api/orders", json=order_payload(2))
+    order_id = response.json()["id"]
+
+    with sessions() as db:
+        await fulfill_accepted_order(db, app.state.sheets, order_id)
+        order = db.get(Order, order_id)
+        order.status = "accepted"
+        db.commit()
+
     assert len(app.state.sheets.updates) == 1
     update = app.state.sheets.updates[0]
-    assert update.variant_id == "variant-1"
     assert update.expected_stock == 2
     assert update.new_stock == 0
-    assert update.sheet_row > 0
     with sessions() as db:
         assert db.get(Variant, "variant-1").stock == 0
 
@@ -119,13 +136,15 @@ def test_order_cannot_exceed_stock(api) -> None:
         assert db.get(Variant, "variant-1").stock == 2
 
 
-def test_sheet_failure_keeps_local_stock(api) -> None:
+@pytest.mark.asyncio
+async def test_sheet_failure_on_accept_keeps_local_stock(api) -> None:
     app, sessions = api
-    app.state.sheets = FakeSheets(fail=True)
     with TestClient(app) as client:
-        response = client.post("/api/orders", json=order_payload(1))
-
-    assert response.status_code == 503
+        order_id = client.post("/api/orders", json=order_payload(1)).json()["id"]
+    app.state.sheets = FakeSheets(fail=True)
+    with pytest.raises(SheetsError):
+        with sessions() as db:
+            await fulfill_accepted_order(db, app.state.sheets, order_id)
     with sessions() as db:
         assert db.get(Variant, "variant-1").stock == 2
 

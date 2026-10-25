@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.auth import TelegramIdentity, current_user, require_admin
 from app.catalog.service import catalog_payload, sync_catalog
 from app.db import get_db
-from app.integrations.google_sheets import GoogleSheets, SheetsError, StockUpdate
+from app.integrations.google_sheets import GoogleSheets, SheetsError
+from app.orders.stock import available_units
 from app.models import Order, OrderItem, Product, RestockSubscription, Variant
 
 router = APIRouter(prefix="/api")
@@ -21,17 +22,6 @@ ORDER_STATUS_LABELS = {
     "accepted": "Подтверждён",
     "contacted": "Связались",
 }
-
-
-def _stock_update(variant: Variant, expected_stock: int, new_stock: int) -> StockUpdate:
-    return StockUpdate(
-        variant_id=variant.id,
-        expected_stock=expected_stock,
-        new_stock=new_stock,
-        sheet_gid=variant.sheet_gid,
-        sheet_row=variant.sheet_row,
-        stock_column=variant.stock_column,
-    )
 
 
 def _order_summary(order: Order) -> dict:
@@ -101,7 +91,6 @@ async def create_order(
     user: TelegramIdentity = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    sheets = sheets_from(request)
     demo_order = user.is_demo
 
     quantities = Counter[str]()
@@ -123,35 +112,12 @@ async def create_order(
         variant = by_id[variant_id]
         if not variant.product.active:
             raise HTTPException(status_code=409, detail=f"{variant.product.name} больше не продаётся")
-        if variant.stock < quantity:
+        free = available_units(db, variant)
+        if free < quantity:
             raise HTTPException(
                 status_code=409,
-                detail=f"«{variant.product.name}»: доступно только {variant.stock} шт.",
+                detail=f"«{variant.product.name}»: доступно только {free} шт.",
             )
-
-    before = [
-        _stock_update(
-            variant,
-            variant.stock - quantities[variant.id],
-            variant.stock,
-        )
-        for variant in variants
-        if variant.sheet_gid != "demo"
-    ]
-    updates = [
-        _stock_update(
-            variant,
-            variant.stock,
-            variant.stock - quantities[variant.id],
-        )
-        for variant in variants
-        if variant.sheet_gid != "demo"
-    ]
-    try:
-        if not demo_order:
-            await sheets.update_stocks(updates)
-    except SheetsError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     total = sum(by_id[variant_id].price * quantity for variant_id, quantity in quantities.items())
     order = Order(
@@ -167,7 +133,6 @@ async def create_order(
     db.add(order)
     for variant_id, quantity in quantities.items():
         variant = by_id[variant_id]
-        variant.stock -= quantity
         order.items.append(
             OrderItem(
                 variant_id=variant.id,
@@ -182,11 +147,6 @@ async def create_order(
         db.refresh(order)
     except Exception:
         db.rollback()
-        if sheets.can_write and before and not demo_order:
-            try:
-                await sheets.update_stocks(before)
-            except SheetsError:
-                pass
         raise HTTPException(status_code=500, detail="Не удалось сохранить заказ")
 
     try:

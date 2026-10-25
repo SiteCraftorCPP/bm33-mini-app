@@ -19,6 +19,9 @@ cd web
 npm ci
 VITE_BOT_USERNAME=chesalin_hockey_bot npm run build
 systemctl reload nginx
+systemctl restart ches-hockey-api
+sleep 2
+systemctl is-active ches-hockey-api
 echo OK
 """
 

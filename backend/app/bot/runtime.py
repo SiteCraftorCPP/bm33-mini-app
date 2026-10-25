@@ -18,12 +18,15 @@ from sqlalchemy.orm import selectinload
 
 from app.config import Settings
 from app.db import SessionLocal
+from app.integrations.google_sheets import GoogleSheets, SheetsError
 from app.models import Order, Product, RestockSubscription, SupportTopic, Variant
+from app.orders.stock import fulfill_accepted_order
 
 
 class TelegramService:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, sheets: GoogleSheets):
         self.settings = settings
+        self.sheets = sheets
         self.bot = Bot(settings.bot_token) if settings.bot_token else None
         self.dispatcher = Dispatcher()
         self.router = Router()
@@ -94,13 +97,25 @@ class TelegramService:
             if new_status not in labels:
                 await call.answer()
                 return
+            order_id = int(parts[1])
             with SessionLocal() as db:
-                order = db.get(Order, int(parts[1]))
+                order = db.get(Order, order_id)
+                if order is None:
+                    await call.answer("Заказ не найден", show_alert=True)
+                    return
+                previous_status = order.status
+                user_id = order.telegram_user_id
+                if new_status == "accepted" and previous_status != "accepted":
+                    try:
+                        await fulfill_accepted_order(db, self.sheets, order_id)
+                    except SheetsError as exc:
+                        await call.answer(str(exc), show_alert=True)
+                        return
+                order = db.get(Order, order_id)
                 if order is None:
                     await call.answer("Заказ не найден", show_alert=True)
                     return
                 order.status = new_status
-                user_id = order.telegram_user_id
                 db.commit()
             await call.answer(labels[new_status])
             if self.bot:

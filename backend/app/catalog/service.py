@@ -10,6 +10,7 @@ from app.catalog.importer import (
     stable_product_id,
 )
 from app.models import Product, Variant
+from app.orders.stock import pending_quantities
 
 
 CATEGORY_ORDER = (
@@ -84,6 +85,7 @@ def sync_catalog(db: Session, imported: list[ImportedProduct]) -> list[str]:
 
 
 def catalog_payload(db: Session) -> dict:
+    reserved = pending_quantities(db)
     products = db.scalars(
         select(Product)
         .where(Product.active.is_(True))
@@ -95,7 +97,10 @@ def catalog_payload(db: Session) -> dict:
     payload_products = []
     for product in products:
         category_counts[product.category] = category_counts.get(product.category, 0) + 1
-        available = sum(variant.stock for variant in product.variants)
+        variant_stocks = [
+            max(variant.stock - reserved.get(variant.id, 0), 0) for variant in product.variants
+        ]
+        available = sum(variant_stocks)
         prices = [variant.price for variant in product.variants if variant.price > 0]
         payload_products.append(
             {
@@ -115,7 +120,7 @@ def catalog_payload(db: Session) -> dict:
                         "option2Value": variant.option2_value,
                         "side": variant.side,
                         "label": variant.label,
-                        "stock": variant.stock,
+                        "stock": max(variant.stock - reserved.get(variant.id, 0), 0),
                         "price": variant.price,
                     }
                     for variant in product.variants
