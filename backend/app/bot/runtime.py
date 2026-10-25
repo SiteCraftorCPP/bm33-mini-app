@@ -46,7 +46,7 @@ class TelegramService:
         if not url:
             return None
         return InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(text="Написать менеджеру", url=url)]]
+            inline_keyboard=[[InlineKeyboardButton(text="💬 Написать менеджеру", url=url)]]
         )
 
     def _register_handlers(self) -> None:
@@ -59,17 +59,18 @@ class TelegramService:
                 markup = self._manager_link_markup()
                 if markup:
                     await message.answer(
-                        "Напишите менеджеру в Telegram — ответит в личных сообщениях.",
+                        "💬 Напишите менеджеру в Telegram — ответит в личных сообщениях.",
                         reply_markup=markup,
                     )
                 else:
                     await message.answer(
-                        "Контакт менеджера пока не настроен. Оформите заказ в магазине — мы свяжемся с вами.",
+                        "Контакт менеджера пока не настроен. 🏒 Оформите заказ в магазине — мы свяжемся с вами.",
                         reply_markup=self._home_keyboard(),
                     )
                 return
             await message.answer(
-                "Добро пожаловать в Ches Hockey.\nЭкипировка в наличии с быстрым оформлением через менеджера.",
+                "🏒 Добро пожаловать в Ches Hockey!\n\n"
+                "🧤 Экипировка в наличии — быстрое оформление через менеджера ⚡",
                 reply_markup=self._start_keyboard(),
             )
 
@@ -78,7 +79,7 @@ class TelegramService:
             markup = self._manager_link_markup()
             await call.answer()
             if markup and call.message:
-                await call.message.answer("Перейдите в чат с менеджером:", reply_markup=markup)
+                await call.message.answer("📲 Перейдите в чат с менеджером:", reply_markup=markup)
             elif call.message:
                 await call.message.answer("Контакт менеджера пока не настроен.")
 
@@ -143,7 +144,7 @@ class TelegramService:
         try:
             await self.bot.set_chat_menu_button(
                 menu_button=MenuButtonWebApp(
-                    text="Открыть магазин",
+                    text="🛒 Магазин",
                     web_app=WebAppInfo(url=self.settings.public_webapp_url),
                 )
             )
@@ -239,14 +240,14 @@ class TelegramService:
         rows = [
             [
                 InlineKeyboardButton(
-                    text="Открыть магазин",
+                    text="🛒 Открыть магазин",
                     web_app=WebAppInfo(url=self.settings.public_webapp_url),
                 )
             ],
         ]
         url = self.settings.manager_telegram_url
         if url:
-            rows.append([InlineKeyboardButton(text="Написать менеджеру", url=url)])
+            rows.append([InlineKeyboardButton(text="💬 Написать менеджеру", url=url)])
         return InlineKeyboardMarkup(inline_keyboard=rows)
 
     def _home_keyboard(self) -> InlineKeyboardMarkup:
@@ -254,7 +255,7 @@ class TelegramService:
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text="Вернуться в магазин",
+                        text="🛒 Вернуться в магазин",
                         web_app=WebAppInfo(url=self.settings.public_webapp_url),
                     )
                 ]
