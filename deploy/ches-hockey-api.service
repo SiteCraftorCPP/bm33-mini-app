@@ -1,0 +1,17 @@
+[Unit]
+Description=Ches Hockey API and Telegram bot
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/bm33-mini-app
+Environment=PYTHONPATH=/opt/bm33-mini-app/backend
+EnvironmentFile=/etc/ches-hockey/env
+ExecStart=/opt/bm33-mini-app/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
