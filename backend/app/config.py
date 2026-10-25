@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     bot_token: str = ""
     admin_ids: str = ""
     support_chat_id: str = ""
+    manager_telegram_username: str = ""
     run_bot: bool = False
 
     google_sheet_id: str = "1Jvgo--zRkIQsdl5X1JWGeGsRQybH1r2XO84955qrtPY"
@@ -38,6 +39,11 @@ class Settings(BaseSettings):
     def support_chat_id_int(self) -> int | None:
         value = self.support_chat_id.strip()
         return int(value) if value.lstrip("-").isdigit() else None
+
+    @property
+    def manager_telegram_url(self) -> str:
+        username = self.manager_telegram_username.strip().lstrip("@")
+        return f"https://t.me/{username}" if username else ""
 
 
 @lru_cache

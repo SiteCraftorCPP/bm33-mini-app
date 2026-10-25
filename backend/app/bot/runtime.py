@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 from app.config import Settings
 from app.db import SessionLocal
 from app.integrations.google_sheets import GoogleSheets, SheetsError
-from app.models import Order, Product, RestockSubscription, SupportTopic, Variant
+from app.models import Order, Product, RestockSubscription, Variant
 from app.orders.stock import fulfill_accepted_order
 
 
@@ -32,8 +32,6 @@ class TelegramService:
         self.router = Router()
         self.dispatcher.include_router(self.router)
         self.polling_task: asyncio.Task | None = None
-        self.waiting_users: set[int] = set()
-        self.admin_replies: dict[int, tuple[int, int | None]] = {}
         self.log = logging.getLogger("telegram")
         self._register_handlers()
 
@@ -43,6 +41,14 @@ class TelegramService:
             return [self.settings.support_chat_id_int]
         return list(self.settings.admin_id_set)
 
+    def _manager_link_markup(self) -> InlineKeyboardMarkup | None:
+        url = self.settings.manager_telegram_url
+        if not url:
+            return None
+        return InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="Написать менеджеру", url=url)]]
+        )
+
     def _register_handlers(self) -> None:
         router = self.router
 
@@ -50,11 +56,17 @@ class TelegramService:
         async def start(message: Message) -> None:
             args = (message.text or "").split(maxsplit=1)
             if len(args) > 1 and args[1] == "support":
-                self.waiting_users.add(message.from_user.id)
-                await message.answer(
-                    "Напишите сообщение менеджеру. Можно отправить текст, фото или видео.",
-                    reply_markup=self._home_keyboard(),
-                )
+                markup = self._manager_link_markup()
+                if markup:
+                    await message.answer(
+                        "Напишите менеджеру в Telegram — ответит в личных сообщениях.",
+                        reply_markup=markup,
+                    )
+                else:
+                    await message.answer(
+                        "Контакт менеджера пока не настроен. Оформите заказ в магазине — мы свяжемся с вами.",
+                        reply_markup=self._home_keyboard(),
+                    )
                 return
             await message.answer(
                 "Добро пожаловать в Ches Hockey.\nЭкипировка в наличии с быстрым оформлением через менеджера.",
@@ -63,25 +75,12 @@ class TelegramService:
 
         @router.callback_query(F.data == "support")
         async def support(call: CallbackQuery) -> None:
-            self.waiting_users.add(call.from_user.id)
+            markup = self._manager_link_markup()
             await call.answer()
-            await call.message.answer("Напишите сообщение. Менеджер ответит прямо сюда.")
-
-        @router.callback_query(F.data.startswith("reply:"))
-        async def arm_reply(call: CallbackQuery) -> None:
-            if call.from_user.id not in self.settings.admin_id_set:
-                await call.answer("Нет доступа", show_alert=True)
-                return
-            target = call.data.removeprefix("reply:")
-            if not target.isdigit():
-                await call.answer()
-                return
-            self.admin_replies[call.from_user.id] = (
-                int(target),
-                call.message.message_thread_id if call.message else None,
-            )
-            await call.answer()
-            await call.message.answer("Введите ответ пользователю.")
+            if markup and call.message:
+                await call.message.answer("Перейдите в чат с менеджером:", reply_markup=markup)
+            elif call.message:
+                await call.message.answer("Контакт менеджера пока не настроен.")
 
         @router.callback_query(F.data.startswith("order:"))
         async def update_order(call: CallbackQuery) -> None:
@@ -137,23 +136,6 @@ class TelegramService:
                     await self.bot.send_message(user_id, text, reply_markup=markup)
                 except Exception:
                     self.log.exception("order status notification failed")
-
-        @router.message()
-        async def route_message(message: Message) -> None:
-            if message.from_user is None or self.bot is None:
-                return
-            if message.from_user.id in self.admin_replies:
-                await self._handle_admin_message(message)
-                return
-            support_chat_id = self.settings.support_chat_id_int
-            if support_chat_id is not None and message.chat.id == support_chat_id:
-                await self._handle_admin_message(message)
-                return
-            if message.chat.type != "private" or (message.text or "").startswith("/"):
-                return
-            if message.from_user.id not in self.waiting_users:
-                return
-            await self._forward_ticket(message)
 
     async def start(self) -> None:
         if self.bot is None:
@@ -253,76 +235,19 @@ class TelegramService:
                     self.log.exception("restock notification failed")
             db.commit()
 
-    async def _forward_ticket(self, message: Message) -> None:
-        chat_id = self.settings.support_chat_id_int
-        if chat_id is None:
-            for admin_id in self.settings.admin_id_set:
-                await self._copy_with_header(message, admin_id, None)
-        else:
-            thread_id = await self._topic_for(message, chat_id)
-            await self._copy_with_header(message, chat_id, thread_id)
-        await message.answer("Сообщение передано. Ответ менеджера придёт сюда.")
-
-    async def _topic_for(self, message: Message, chat_id: int) -> int:
-        with SessionLocal() as db:
-            topic = db.get(SupportTopic, message.from_user.id)
-            if topic:
-                return topic.thread_id
-            name = message.from_user.full_name
-            if message.from_user.username:
-                name += f" @{message.from_user.username}"
-            created = await self.bot.create_forum_topic(chat_id, name=name[:128])
-            db.add(
-                SupportTopic(
-                    telegram_user_id=message.from_user.id,
-                    thread_id=created.message_thread_id,
-                )
-            )
-            db.commit()
-            return created.message_thread_id
-
-    async def _copy_with_header(self, message: Message, chat_id: int, thread_id: int | None) -> None:
-        kwargs = {"message_thread_id": thread_id} if thread_id else {}
-        username = f"@{message.from_user.username}" if message.from_user.username else "без username"
-        header = f"{message.from_user.full_name} · {username} · ID {message.from_user.id}"
-        await self.bot.send_message(
-            chat_id,
-            header,
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="Ответить", callback_data=f"reply:{message.from_user.id}")]
-                ]
-            ),
-            **kwargs,
-        )
-        await self.bot.copy_message(chat_id, message.chat.id, message.message_id, **kwargs)
-
-    async def _handle_admin_message(self, message: Message) -> None:
-        if message.from_user.id not in self.settings.admin_id_set:
-            return
-        armed = self.admin_replies.pop(message.from_user.id, None)
-        if armed is None:
-            return
-        target_id, thread_id = armed
-        try:
-            await self.bot.copy_message(target_id, message.chat.id, message.message_id)
-            kwargs = {"message_thread_id": thread_id} if thread_id else {}
-            await self.bot.send_message(message.chat.id, "Отправлено пользователю.", **kwargs)
-        except Exception:
-            self.log.exception("support reply failed")
-
     def _start_keyboard(self) -> InlineKeyboardMarkup:
-        return InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="Открыть магазин",
-                        web_app=WebAppInfo(url=self.settings.public_webapp_url),
-                    )
-                ],
-                [InlineKeyboardButton(text="Написать менеджеру", callback_data="support")],
-            ]
-        )
+        rows = [
+            [
+                InlineKeyboardButton(
+                    text="Открыть магазин",
+                    web_app=WebAppInfo(url=self.settings.public_webapp_url),
+                )
+            ],
+        ]
+        url = self.settings.manager_telegram_url
+        if url:
+            rows.append([InlineKeyboardButton(text="Написать менеджеру", url=url)])
+        return InlineKeyboardMarkup(inline_keyboard=rows)
 
     def _home_keyboard(self) -> InlineKeyboardMarkup:
         return InlineKeyboardMarkup(

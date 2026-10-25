@@ -62,6 +62,14 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+@router.get("/config")
+def public_config(request: Request) -> dict:
+    settings = request.app.state.settings
+    return {
+        "managerTelegramUrl": settings.manager_telegram_url,
+    }
+
+
 @router.get("/catalog")
 def catalog(db: Session = Depends(get_db)) -> dict:
     return catalog_payload(db)

@@ -24,6 +24,15 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>
 }
 
+export async function loadPublicConfig(): Promise<{ managerTelegramUrl: string }> {
+  try {
+    return await request<{ managerTelegramUrl: string }>('/api/config')
+  } catch {
+    const username = (import.meta.env.VITE_MANAGER_USERNAME as string | undefined)?.replace(/^@/, '')
+    return { managerTelegramUrl: username ? `https://t.me/${username}` : '' }
+  }
+}
+
 export async function loadCatalog(): Promise<{ catalog: Catalog; offline: boolean }> {
   try {
     const catalog = await request<Catalog>('/api/catalog')

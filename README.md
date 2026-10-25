@@ -1,6 +1,6 @@
 # Ches Hockey Mini App
 
-Локальный MVP Telegram-магазина хоккейной экипировки: каталог из Google Sheets, варианты товаров, фильтры клюшек, корзина, заказ менеджеру, уведомления о поступлении и тикеты поддержки.
+Локальный MVP Telegram-магазина хоккейной экипировки: каталог из Google Sheets, варианты товаров, фильтры клюшек, корзина, заказ в группу менеджеров, уведомления о поступлении, ссылка на менеджера в Telegram.
 
 ## Быстрый запуск на Windows
 
@@ -31,7 +31,7 @@
 ## Настройка интеграций
 
 1. Скопируйте `.env.example` в `.env`.
-2. Укажите новый `BOT_TOKEN`, `ADMIN_IDS` и ID forum-чата в `SUPPORT_CHAT_ID`.
+2. Укажите `BOT_TOKEN`, `ADMIN_IDS`, группу заказов в `SUPPORT_CHAT_ID` и username менеджера в `MANAGER_TELEGRAM_USERNAME` (без `@`).
 3. Для записи остатков создайте service account Google, положите JSON вне Git, задайте `GOOGLE_SERVICE_ACCOUNT_FILE` и дайте email service account права редактора таблицы.
 4. На локальной машине оставьте `DEMO_MODE=true`. Перед публикацией установите `DEMO_MODE=false`, `RUN_BOT=true` и HTTPS-адрес в `PUBLIC_WEBAPP_URL`.
 

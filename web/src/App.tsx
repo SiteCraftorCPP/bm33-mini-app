@@ -31,6 +31,7 @@ import {
   loadOrder,
   loadOrders,
   loadProfile,
+  loadPublicConfig,
 } from './api'
 import { filterGroupsForCategory, productMatchesFilters } from './catalogFilters'
 import { formatModelCount } from './pluralRu'
@@ -73,14 +74,18 @@ function App() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [orderId, setOrderId] = useState<number | null>(null)
+  const [managerTelegramUrl, setManagerTelegramUrl] = useState('')
 
   useEffect(() => {
-    Promise.all([loadCatalog(), loadProfile()]).then(([{ catalog: next, offline: isOffline }, me]) => {
-      setCatalog(next)
-      setOffline(isOffline)
-      setProfile(me)
-      setLoading(false)
-    })
+    Promise.all([loadCatalog(), loadProfile(), loadPublicConfig()]).then(
+      ([{ catalog: next, offline: isOffline }, me, config]) => {
+        setCatalog(next)
+        setOffline(isOffline)
+        setProfile(me)
+        setManagerTelegramUrl(config.managerTelegramUrl)
+        setLoading(false)
+      },
+    )
   }, [])
 
   useEffect(() => {
@@ -182,8 +187,13 @@ function App() {
   }
 
   const openSupport = () => {
-    const username = import.meta.env.VITE_BOT_USERNAME || 'chesalin_hockey_bot'
-    const url = `https://t.me/${username}?start=support`
+    const fallback = (import.meta.env.VITE_MANAGER_USERNAME as string | undefined)?.replace(/^@/, '')
+    const url =
+      managerTelegramUrl || (fallback ? `https://t.me/${fallback}` : '')
+    if (!url) {
+      setError('Контакт менеджера не настроен')
+      return
+    }
     if (window.Telegram?.WebApp) window.Telegram.WebApp.openTelegramLink(url)
     else window.open(url, '_blank', 'noopener,noreferrer')
   }
@@ -567,7 +577,7 @@ function CheckoutView({
   return (
     <section className="page checkout-page">
       <button className="back-link" onClick={onBack}><ArrowLeft size={18} /> Корзина</button>
-      <div className="page-title"><span className="eyebrow">ПОСЛЕДНИЙ ШАГ</span><h1>Оформление</h1><p>Оплата после связи с менеджером</p></div>
+      <div className="page-title"><span className="eyebrow">ПОСЛЕДНИЙ ШАГ</span><h1>Оформление</h1><p>Менеджер свяжется с вами в Telegram</p></div>
       <form onSubmit={onSubmit}>
         <div className="form-card">
           <h3><span>01</span> Контакты</h3>
@@ -587,7 +597,7 @@ function CheckoutView({
         <button className="primary-button checkout-submit" disabled={submitting || !cart.length}>
           {submitting ? 'Проверяем остатки…' : 'Подтвердить заказ'} {!submitting && <ArrowRight size={18} />}
         </button>
-        <p className="form-note">Нажимая кнопку, вы отправляете заявку менеджеру. Онлайн-оплаты на этом этапе нет.</p>
+        <p className="form-note">Нажимая кнопку, вы отправляете заявку менеджеру в группу магазина. Оплата и доставка — только в переписке с менеджером.</p>
       </form>
     </section>
   )
@@ -609,7 +619,7 @@ function SuccessView({
       <div className="success-orbit"><span><CheckCircle2 size={46} /></span></div>
       <span className="eyebrow">ЗАЯВКА ПРИНЯТА</span>
       <h1>Заказ №{orderId}<br />уже у менеджера</h1>
-      <p>{offline ? 'Это демонстрационный заказ — он не отправлен менеджеру.' : 'Свяжемся с вами в Telegram или по телефону, уточним наличие и доставку.'}</p>
+      <p>{offline ? 'Это демонстрационный заказ — он не отправлен менеджеру.' : 'Заявка ушла менеджерам. Все вопросы — в личке с менеджером в Telegram.'}</p>
       <div className="success-steps">
         <div className="is-done"><span>1</span><strong>Заказ создан</strong></div>
         <div><span>2</span><strong>Связь с менеджером</strong></div>

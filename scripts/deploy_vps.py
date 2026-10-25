@@ -21,11 +21,13 @@ def parse_pas(text: str) -> dict[str, str]:
     admins = re.search(r"админы:\s*([0-9;]+)", text, re.I)
     host = re.search(r"хост:\s*([0-9.]+)\s*/\s*(\S+)", text, re.I)
     domain = re.search(r"домен:\s*(\S+)", text, re.I)
+    manager = re.search(r"админы user name:\s*@?(\S+)", text, re.I)
     if not all([token, admins, host, domain]):
         raise SystemExit("Не удалось разобрать pas bm33 mini app.txt")
     return {
         "bot_token": token.group(1),
         "admin_ids": admins.group(1).replace(";", ","),
+        "manager_username": manager.group(1) if manager else "",
         "host": host.group(1),
         "password": host.group(2),
         "domain": domain.group(1).strip(),
@@ -51,6 +53,7 @@ RUN_BOT=true
 BOT_TOKEN={cfg['bot_token']}
 ADMIN_IDS={cfg['admin_ids']}
 SUPPORT_CHAT_ID=-1004387232874
+MANAGER_TELEGRAM_USERNAME={cfg.get("manager_username", "")}
 GOOGLE_SHEET_ID=1Jvgo--zRkIQsdl5X1JWGeGsRQybH1r2XO84955qrtPY
 GOOGLE_SERVICE_ACCOUNT_FILE={REMOTE_SA}
 SHEETS_SYNC_INTERVAL_SECONDS=60
