@@ -24,19 +24,26 @@ CATEGORY_ORDER = (
 )
 
 
-def _merged_products(imported: list[ImportedProduct]) -> list[tuple[str, str, str, int, list[ImportedVariant]]]:
-    grouped: dict[tuple[str, str], tuple[str, int, list[ImportedVariant]]] = {}
+def _merged_products(
+    imported: list[ImportedProduct],
+) -> list[tuple[str, str, str, int, str, list[ImportedVariant]]]:
+    grouped: dict[tuple[str, str], tuple[str, int, str, list[ImportedVariant]]] = {}
     for product in imported:
         name = canonical_product_name(product.name, product.category)
         product_id = stable_product_id(product.category, name)
         key = (product.category, product_id)
         if key not in grouped:
-            grouped[key] = (name, product.sort_order, [])
-        grouped[key][2].extend(product.variants)
+            grouped[key] = (name, product.sort_order, product.image_url, [])
+        else:
+            prev_name, sort_order, image_url, variants = grouped[key]
+            if not image_url and product.image_url:
+                image_url = product.image_url
+            grouped[key] = (prev_name, sort_order, image_url, variants)
+        grouped[key][3].extend(product.variants)
 
     merged = []
-    for (category, product_id), (name, sort_order, variants) in grouped.items():
-        merged.append((product_id, name, category, sort_order, variants))
+    for (category, product_id), (name, sort_order, image_url, variants) in grouped.items():
+        merged.append((product_id, name, category, sort_order, image_url, variants))
     return sorted(merged, key=lambda item: item[3])
 
 
@@ -45,7 +52,7 @@ def sync_catalog(db: Session, imported: list[ImportedProduct]) -> list[str]:
     seen_variants: set[str] = set()
 
     db.execute(update(Product).values(active=False))
-    for product_id, name, category, sort_order, source_variants in _merged_products(imported):
+    for product_id, name, category, sort_order, image_url, source_variants in _merged_products(imported):
         product = db.get(Product, product_id)
         if product is None:
             product = Product(id=product_id, name=name, category=category)
@@ -54,6 +61,7 @@ def sync_catalog(db: Session, imported: list[ImportedProduct]) -> list[str]:
         product.category = category
         product.sort_order = sort_order
         product.active = True
+        product.image_url = image_url
 
         for source_variant in source_variants:
             seen_variants.add(source_variant.id)

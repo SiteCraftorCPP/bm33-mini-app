@@ -17,7 +17,7 @@ git fetch origin
 git reset --hard origin/main
 cd web
 npm ci
-VITE_MANAGER_USERNAME=Makar2903 VITE_BOT_USERNAME=chesalin_hockey_bot npm run build
+VITE_MANAGER_USERNAME=Ches2424 VITE_BOT_USERNAME=chesalin_hockey_bot npm run build
 systemctl reload nginx
 chown root:www-data /etc/ches-hockey
 chmod 750 /etc/ches-hockey

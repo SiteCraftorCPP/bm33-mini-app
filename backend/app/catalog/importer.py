@@ -22,14 +22,15 @@ class SheetDefinition:
     price_column: int
     side: str = ""
     split_mixed: bool = False
+    image_column: int | None = None
 
 
 SHEETS: tuple[SheetDefinition, ...] = (
-    SheetDefinition("367022394", "Клюшки левые", "Клюшки", 0, 1, "Флекс", 2, "Загиб", 3, 4, "L"),
-    SheetDefinition("2084297659", "Клюшки правые", "Клюшки", 0, 1, "Флекс", 2, "Загиб", 3, 4, "R"),
-    SheetDefinition("740178786", "Вратарские", "Вратарские", 0, 1, "Размер", 2, "Загиб", 3, 4),
-    SheetDefinition("1252639504", "Коньки Shadow", "Коньки", 0, 1, "Размер", 2, "Fit", 3, 4),
-    SheetDefinition("431205108", "Термобелье", "Термобельё", 0, 1, "Размер", None, "", 2, 3),
+    SheetDefinition("367022394", "Клюшки левые", "Клюшки", 0, 1, "Флекс", 2, "Загиб", 3, 4, "L", image_column=5),
+    SheetDefinition("2084297659", "Клюшки правые", "Клюшки", 0, 1, "Флекс", 2, "Загиб", 3, 4, "R", image_column=5),
+    SheetDefinition("740178786", "Вратарские", "Вратарские", 0, 1, "Размер", 2, "Загиб", 3, 4, image_column=5),
+    SheetDefinition("1252639504", "Коньки Shadow", "Коньки", 0, 1, "Размер", 2, "Fit", 3, 4, image_column=5),
+    SheetDefinition("431205108", "Термобелье", "Термобельё", 0, 1, "Размер", None, "", 2, 3, image_column=4),
     SheetDefinition(
         "1187117524",
         "Перчатки, защита,одежда",
@@ -42,8 +43,9 @@ SHEETS: tuple[SheetDefinition, ...] = (
         3,
         4,
         split_mixed=True,
+        image_column=5,
     ),
-    SheetDefinition("1446201361", "Баулы и рюкзаки", "Баулы и рюкзаки", 0, 1, "Размер", None, "", 2, 3),
+    SheetDefinition("1446201361", "Баулы и рюкзаки", "Баулы и рюкзаки", 0, 1, "Размер", None, "", 2, 3, image_column=4),
 )
 
 
@@ -74,6 +76,7 @@ class ImportedProduct:
     name: str
     category: str
     sort_order: int
+    image_url: str = ""
     variants: list[ImportedVariant] = field(default_factory=list)
 
 
@@ -147,6 +150,23 @@ def stable_variant_id(
     )
 
 
+def normalize_image_url(raw: str) -> str:
+    url = (raw or "").strip()
+    if not url:
+        return ""
+    file_id = None
+    match = re.search(r"drive\.google\.com/file/d/([^/]+)", url, flags=re.I)
+    if match:
+        file_id = match.group(1)
+    else:
+        match = re.search(r"[?&]id=([^&]+)", url, flags=re.I)
+        if match and "drive.google" in url.casefold():
+            file_id = match.group(1)
+    if file_id:
+        return f"https://drive.google.com/uc?export=view&id={file_id}"
+    return url
+
+
 def _number(value: str) -> int | None:
     cleaned = re.sub(r"[^\d,.-]", "", value or "").replace(",", ".")
     if not cleaned:
@@ -190,13 +210,25 @@ def parse_sheet(csv_text: str, definition: SheetDefinition, sort_offset: int = 0
         if raw_name:
             previous_name = raw_name
             category = _category(definition, raw_name)
+            image_raw = ""
+            if definition.image_column is not None:
+                image_raw = _cell(row, definition.image_column)
             current = ImportedProduct(
                 id=stable_product_id(category, raw_name),
                 name=raw_name,
                 category=category,
                 sort_order=sort_offset + len(products),
+                image_url=normalize_image_url(image_raw),
             )
             products.append(current)
+        elif (
+            current is not None
+            and definition.image_column is not None
+            and not current.image_url
+        ):
+            extra = normalize_image_url(_cell(row, definition.image_column))
+            if extra:
+                current.image_url = extra
         elif not previous_name or current is None:
             continue
 

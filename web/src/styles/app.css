@@ -245,6 +245,45 @@ main {
   clip-path: polygon(0 0, 94% 0, 100% 50%, 94% 100%, 0 100%);
 }
 
+.home-shortcut {
+  margin: 0 16px 18px;
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #e8f2ff 0%, #f6f9fc 100%);
+  border: 1px solid #d8e6f5;
+}
+
+.home-shortcut__button {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: var(--ink);
+}
+
+.home-shortcut__button strong {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.home-shortcut__button small {
+  display: block;
+  color: var(--muted);
+  font-size: var(--text-caption);
+  line-height: 1.35;
+}
+
+.home-shortcut__hint {
+  margin: 10px 0 0 32px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .hero-stripe {
   position: absolute;
   z-index: 1;

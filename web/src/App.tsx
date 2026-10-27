@@ -18,6 +18,7 @@ import {
   Settings,
   ShieldCheck,
   ShoppingBag,
+  Smartphone,
   SlidersHorizontal,
   Trash2,
   WifiOff,
@@ -39,6 +40,7 @@ import { CategoryIcon } from './components/CategoryIcon'
 import { ProductCard } from './components/ProductCard'
 import { ProductSheet } from './components/ProductSheet'
 import { ProductVisual } from './components/ProductVisual'
+import { checkHomeScreenStatus, homeScreenSupported, requestAddToHomeScreen } from './homeScreen'
 import type { CartLine, Catalog, CheckoutData, OrderDetail, OrderSummary, Product, UserProfile, Variant, View } from './types'
 
 const money = new Intl.NumberFormat('ru-RU')
@@ -318,6 +320,15 @@ function HomeView({
   onProduct: (product: Product) => void
   onCatalog: () => void
 }) {
+  const [showShortcut, setShowShortcut] = useState(homeScreenSupported())
+
+  useEffect(() => {
+    if (!homeScreenSupported()) return
+    checkHomeScreenStatus().then((status) => {
+      if (status === 'added') setShowShortcut(false)
+    })
+  }, [])
+
   return (
     <>
       <section className="hero">
@@ -331,6 +342,26 @@ function HomeView({
         </div>
         <div className="hero-stripe" />
       </section>
+
+      {showShortcut && (
+        <section className="home-shortcut">
+          <button
+            type="button"
+            className="home-shortcut__button"
+            onClick={() => {
+              requestAddToHomeScreen()
+              window.Telegram?.WebApp.HapticFeedback?.impactOccurred('light')
+            }}
+          >
+            <Smartphone size={20} />
+            <span>
+              <strong>Ярлык на главный экран</strong>
+              <small>Быстрый вход в магазин, как отдельное приложение</small>
+            </span>
+          </button>
+          <p className="home-shortcut__hint">Или меню ⋮ в Telegram → «Создать ярлык»</p>
+        </section>
+      )}
 
       <section className="content-section category-section">
         <div className="section-heading">
