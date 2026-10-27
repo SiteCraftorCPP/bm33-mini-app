@@ -21,7 +21,7 @@ from app.config import Settings
 from app.db import SessionLocal
 from app.integrations.google_sheets import GoogleSheets, SheetsError
 from app.models import Order, Product, RestockSubscription, Variant
-from app.orders.stock import fulfill_accepted_order
+from app.orders.stock import fulfill_accepted_order, restore_accepted_order_stock
 
 
 class TelegramService:
@@ -93,7 +93,11 @@ class TelegramService:
             if len(parts) != 3 or not parts[1].isdigit():
                 await call.answer()
                 return
-            labels = {"accepted": "Принят", "contacted": "Связались"}
+            labels = {
+                "accepted": "Принят",
+                "contacted": "Связались",
+                "cancelled": "Отменён",
+            }
             new_status = parts[2]
             if new_status not in labels:
                 await call.answer()
@@ -104,11 +108,20 @@ class TelegramService:
                 if order is None:
                     await call.answer("Заказ не найден", show_alert=True)
                     return
+                if order.status == "cancelled":
+                    await call.answer("Заказ уже отменён", show_alert=True)
+                    return
                 previous_status = order.status
                 user_id = order.telegram_user_id
                 if new_status == "accepted" and previous_status != "accepted":
                     try:
                         await fulfill_accepted_order(db, self.sheets, order_id)
+                    except SheetsError as exc:
+                        await call.answer(str(exc), show_alert=True)
+                        return
+                if new_status == "cancelled" and previous_status == "accepted":
+                    try:
+                        await restore_accepted_order_stock(db, self.sheets, order_id)
                     except SheetsError as exc:
                         await call.answer(str(exc), show_alert=True)
                         return
@@ -160,6 +173,14 @@ class TelegramService:
                         )
                     except Exception:
                         self.log.exception("order status user notify failed")
+                elif new_status == "cancelled":
+                    try:
+                        await self.bot.send_message(
+                            user_id,
+                            f"Заказ №{order_id} отменён. Если нужна помощь - напишите менеджеру.",
+                        )
+                    except Exception:
+                        self.log.exception("order cancel user notify failed")
 
     async def start(self) -> None:
         if self.bot is None:

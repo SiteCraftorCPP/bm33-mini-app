@@ -28,6 +28,11 @@ def test_format_order_text_uses_dashes_not_bullets() -> None:
 
 def test_order_markup_hides_buttons_after_accept() -> None:
     assert order_action_markup(1, "accepted", "https://x.ru") is None
+    assert order_action_markup(1, "cancelled", "https://x.ru") is None
     contacted = order_action_markup(1, "contacted", "https://x.ru")
     assert contacted is not None
-    assert len(contacted.inline_keyboard) == 1
+    assert len(contacted.inline_keyboard) == 2
+    new = order_action_markup(1, "new", "https://x.ru")
+    assert new is not None
+    assert len(new.inline_keyboard) == 2
+    assert "Отменить" in new.inline_keyboard[1][0].text

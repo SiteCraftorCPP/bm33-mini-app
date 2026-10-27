@@ -21,6 +21,7 @@ ORDER_STATUS_LABELS = {
     "new": "Новый",
     "accepted": "Подтверждён",
     "contacted": "Связались",
+    "cancelled": "Отменён",
 }
 
 

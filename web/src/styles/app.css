@@ -1927,6 +1927,11 @@ main {
   background: #e7f9f1;
 }
 
+.status-pill.status-cancelled {
+  color: #8a3b3b;
+  background: #fdecec;
+}
+
 .status-pill.status-contacted {
   color: #6b4b16;
   background: #fff4df;

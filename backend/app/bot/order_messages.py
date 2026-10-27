@@ -8,6 +8,7 @@ STATUS_LINE = {
     "new": "",
     "contacted": "📞 Связались",
     "accepted": "✅ Принят",
+    "cancelled": "❌ Отменён",
 }
 
 
@@ -42,8 +43,11 @@ def format_order_text(order: Order) -> str:
 
 
 def order_action_markup(order_id: int, status: str, webapp_url: str) -> InlineKeyboardMarkup | None:
-    if status == "accepted":
+    if status in {"accepted", "cancelled"}:
         return None
+    cancel_row = [
+        InlineKeyboardButton(text="❌ Отменить", callback_data=f"order:{order_id}:cancelled"),
+    ]
     if status == "contacted":
         return InlineKeyboardMarkup(
             inline_keyboard=[
@@ -53,6 +57,7 @@ def order_action_markup(order_id: int, status: str, webapp_url: str) -> InlineKe
                         callback_data=f"order:{order_id}:accepted",
                     ),
                 ],
+                cancel_row,
             ]
         )
     return InlineKeyboardMarkup(
@@ -61,6 +66,7 @@ def order_action_markup(order_id: int, status: str, webapp_url: str) -> InlineKe
                 InlineKeyboardButton(text="✅ Принять", callback_data=f"order:{order_id}:accepted"),
                 InlineKeyboardButton(text="📞 Связались", callback_data=f"order:{order_id}:contacted"),
             ],
+            cancel_row,
         ]
     )
 
