@@ -53,6 +53,7 @@ describe('ProductSheet', () => {
   it('shows restock action for an unavailable variant', () => {
     render(<ProductSheet product={{ ...product, variants: [product.variants[1]], stock: 0 }} onClose={vi.fn()} onAdd={vi.fn()} />)
 
+    expect(screen.getByText('Хват')).toBeInTheDocument()
     expect(screen.getByText('Сообщить в Telegram')).toBeInTheDocument()
     expect(screen.queryByText('В корзину')).not.toBeInTheDocument()
   })

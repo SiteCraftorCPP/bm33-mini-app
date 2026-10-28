@@ -2,7 +2,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.catalog.importer import SHEETS, parse_sheet
+from app.catalog.importer import SHEETS, parse_sheet, stick_catalog_warnings
 from app.catalog.service import catalog_payload, sync_catalog
 from app.db import Base
 from app.models import Variant
@@ -17,7 +17,7 @@ Bauer Fuse L,70,92,2,7500
     products = parse_sheet(csv_text, SHEETS[0])
 
     assert len(products) == 1
-    assert products[0].name == "Bauer Fuse L"
+    assert products[0].name == "Bauer Fuse"
     assert [variant.stock for variant in products[0].variants] == [2, 0]
     assert products[0].variants[1].side == "L"
     assert products[0].variants[1].sheet_row == 4
@@ -125,3 +125,35 @@ def test_goalie_side_is_part_of_variant_identity() -> None:
     assert products[0].id == products[1].id
     assert products[0].variants[0].id != products[1].variants[0].id
     assert {products[0].variants[0].side, products[1].variants[0].side} == {"L", "R"}
+
+
+def test_trigger_unleashed_pro_merges_left_and_right() -> None:
+    left = parse_sheet(
+        "Название,Флекс,Загиб,Наличие,Цена\n"
+        "CCM Trigger Unleashed Pro L,30,28,1,7500\n",
+        SHEETS[0],
+    )
+    right = parse_sheet(
+        "Название,Флекс,Загиб,Наличие,Цена\n"
+        "CCM Trigger Unleashed Pro R,30,28,2,7500\n",
+        SHEETS[1],
+    )
+    assert left[0].id == right[0].id
+    assert left[0].name == "CCM Trigger Unleashed Pro"
+    assert len(stick_catalog_warnings(left + right)) == 0
+
+
+def test_mismatched_pro_creates_duplicate_stick_products() -> None:
+    left = parse_sheet(
+        "Название,Флекс,Загиб,Наличие,Цена\n"
+        "CCM Trigger Unleashed L,30,28,1,7500\n",
+        SHEETS[0],
+    )
+    right = parse_sheet(
+        "Название,Флекс,Загиб,Наличие,Цена\n"
+        "CCM Trigger Unleashed Pro R,30,28,2,7500\n",
+        SHEETS[1],
+    )
+    assert left[0].id != right[0].id
+    warnings = stick_catalog_warnings(left + right)
+    assert any("Trigger Unleashed" in item and "2" in item for item in warnings)

@@ -31,7 +31,7 @@ api_health = run("curl -sS http://127.0.0.1:8000/api/health")
 checks.append(("api_health", '"ok"' in api_health or "ok" in api_health.lower(), api_health.strip()[:200]))
 
 env = run("grep -E '^(SUPPORT_CHAT_ID|RUN_BOT|DEMO_MODE)=' /etc/ches-hockey/env")
-checks.append(("support_chat", "SUPPORT_CHAT_ID=-1004387232874" in env, env.strip()))
+checks.append(("support_chat", "SUPPORT_CHAT_ID=-1004378468284" in env, env.strip()))
 
 perms = run(
     "namei -l /etc/ches-hockey/google-service-account.json 2>/dev/null | tail -1; "

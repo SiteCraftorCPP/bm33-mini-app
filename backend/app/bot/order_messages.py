@@ -28,11 +28,17 @@ def format_order_text(order: Order) -> str:
         ],
         "",
         f"Итого: {order.total:,} ₽".replace(",", " "),
-        f"Клиент: {order.customer_name}",
-        f"Телефон: {order.phone}",
-        f"Город: {order.city or 'не указан'}",
-        f"Получение: {order.delivery or 'уточнить'}",
     ]
+    if (order.discount or 0) > 0:
+        lines.append(f"Промокод {order.promo_code}: -{order.discount:,} ₽".replace(",", " "))
+    lines.extend(
+        [
+            f"Клиент: {order.customer_name}",
+            f"Телефон: {order.phone}",
+            f"Город: {order.city or 'не указан'}",
+            f"Получение: {order.delivery or 'уточнить'}",
+        ]
+    )
     if order.telegram_username:
         lines.append(f"Telegram: @{order.telegram_username}")
     else:

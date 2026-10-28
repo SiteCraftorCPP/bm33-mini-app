@@ -46,6 +46,18 @@ export type CheckoutData = {
   city: string
   delivery: string
   comment: string
+  promoCode: string
+}
+
+export type PromoCode = {
+  code: string
+  kind: 'percent' | 'fixed'
+  value: number
+  maxUses: number | null
+  usedCount: number
+  active: boolean
+  note: string
+  createdAt: string
 }
 
 export type UserProfile = {
@@ -109,4 +121,4 @@ declare global {
     }
   }
 }
-
+

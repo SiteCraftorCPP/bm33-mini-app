@@ -1,5 +1,5 @@
 import { mockCatalog } from './mockData'
-import type { Catalog, CheckoutData, OrderDetail, OrderSummary, UserProfile } from './types'
+import type { Catalog, CheckoutData, OrderDetail, OrderSummary, PromoCode, UserProfile } from './types'
 
 const headers = (): HeadersInit => ({
   'Content-Type': 'application/json',
@@ -9,6 +9,9 @@ const headers = (): HeadersInit => ({
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...options, headers: { ...headers(), ...options?.headers } })
+  if (response.status === 204) {
+    return undefined as T
+  }
   if (!response.ok) {
     let message = 'Что-то пошло не так'
     try {
@@ -77,16 +80,78 @@ export async function loadOrder(orderId: number): Promise<OrderDetail> {
   return request<OrderDetail>(`/api/orders/${orderId}`)
 }
 
-export async function adminSyncCatalog(): Promise<{ products: number; restocked: number }> {
-  const payload = await request<{ ok: boolean; products: number; restocked: number }>(
-    '/api/admin/catalog/sync',
-    { method: 'POST' },
-  )
-  return { products: payload.products, restocked: payload.restocked }
+export async function cancelOrder(orderId: number): Promise<{ id: number; status: string; statusLabel: string }> {
+  return request(`/api/orders/${orderId}/cancel`, { method: 'POST' })
+}
+
+export async function adminSyncCatalog(): Promise<{
+  products: number
+  restocked: number
+  stickWarnings: string[]
+}> {
+  const payload = await request<{
+    ok: boolean
+    products: number
+    restocked: number
+    stickWarnings?: string[]
+  }>('/api/admin/catalog/sync', { method: 'POST' })
+  return {
+    products: payload.products,
+    restocked: payload.restocked,
+    stickWarnings: payload.stickWarnings ?? [],
+  }
 }
 
 export async function adminLoadOrders(): Promise<OrderSummary[]> {
   const payload = await request<{ orders: OrderSummary[] }>('/api/admin/orders')
   return payload.orders
 }
-
+
+export async function validatePromo(
+  code: string,
+  subtotal: number,
+): Promise<{ code: string; discount: number; total: number }> {
+  return request('/api/promos/validate', {
+    method: 'POST',
+    body: JSON.stringify({ code, subtotal }),
+  })
+}
+
+export async function adminLoadPromos(): Promise<PromoCode[]> {
+  const payload = await request<{ promos: PromoCode[] }>('/api/admin/promos')
+  return payload.promos
+}
+
+export async function adminCreatePromo(data: {
+  code: string
+  kind: 'percent' | 'fixed'
+  value: number
+  maxUses?: number | null
+  note?: string
+}): Promise<PromoCode> {
+  return request('/api/admin/promos', {
+    method: 'POST',
+    body: JSON.stringify({
+      code: data.code,
+      kind: data.kind,
+      value: data.value,
+      maxUses: data.maxUses ?? null,
+      note: data.note ?? '',
+    }),
+  })
+}
+
+export async function adminPatchPromo(
+  code: string,
+  patch: { active?: boolean; maxUses?: number | null; note?: string },
+): Promise<PromoCode> {
+  return request(`/api/admin/promos/${encodeURIComponent(code)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+}
+
+export async function adminDeletePromo(code: string): Promise<void> {
+  await request<void>(`/api/admin/promos/${encodeURIComponent(code)}`, { method: 'DELETE' })
+}
+

@@ -20,28 +20,47 @@ import {
   ShoppingBag,
   Smartphone,
   SlidersHorizontal,
+  Tag,
   Trash2,
   WifiOff,
   X,
 } from 'lucide-react'
 import {
+  adminCreatePromo,
+  adminDeletePromo,
   adminLoadOrders,
+  adminLoadPromos,
+  adminPatchPromo,
   adminSyncCatalog,
   createOrder,
+  validatePromo,
   loadCatalog,
   loadOrder,
   loadOrders,
   loadProfile,
   loadPublicConfig,
+  cancelOrder,
 } from './api'
-import { filterGroupsForCategory, productMatchesFilters } from './catalogFilters'
+import { filterGroupsForCategory, formatFilterChipLabel, productMatchesFilters, sanitizeCategoryFilters } from './catalogFilters'
+import { formatVariantLabel } from './gripLabel'
 import { formatModelCount } from './pluralRu'
 import { CategoryIcon } from './components/CategoryIcon'
 import { ProductCard } from './components/ProductCard'
 import { ProductSheet } from './components/ProductSheet'
 import { ProductVisual } from './components/ProductVisual'
 import { checkHomeScreenStatus, homeScreenSupported, requestAddToHomeScreen } from './homeScreen'
-import type { CartLine, Catalog, CheckoutData, OrderDetail, OrderSummary, Product, UserProfile, Variant, View } from './types'
+import type {
+  CartLine,
+  Catalog,
+  CheckoutData,
+  OrderDetail,
+  OrderSummary,
+  Product,
+  PromoCode,
+  UserProfile,
+  Variant,
+  View,
+} from './types'
 
 const money = new Intl.NumberFormat('ru-RU')
 
@@ -51,6 +70,7 @@ const emptyCheckout: CheckoutData = {
   city: '',
   delivery: '',
   comment: '',
+  promoCode: '',
 }
 
 function App() {
@@ -61,6 +81,7 @@ function App() {
   const [activeCategory, setActiveCategory] = useState('Все')
   const [query, setQuery] = useState('')
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [sheetFilters, setSheetFilters] = useState<Record<string, string>>({})
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [categoryFilters, setCategoryFilters] = useState<Record<string, string>>({})
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -120,9 +141,17 @@ function App() {
   const cartTotal = cart.reduce((sum, line) => sum + line.variant.price * line.quantity, 0)
 
   const filterGroups = useMemo(
-    () => filterGroupsForCategory(activeCategory, catalog.products),
-    [activeCategory, catalog.products],
+    () => filterGroupsForCategory(activeCategory, catalog.products, categoryFilters),
+    [activeCategory, catalog.products, categoryFilters],
   )
+
+  useEffect(() => {
+    if (activeCategory === 'Все' || !catalog.products.length) return
+    const sane = sanitizeCategoryFilters(activeCategory, catalog.products, categoryFilters)
+    if (JSON.stringify(sane) !== JSON.stringify(categoryFilters)) {
+      setCategoryFilters(sane)
+    }
+  }, [activeCategory, catalog.products, categoryFilters])
 
   const visibleProducts = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('ru')
@@ -132,6 +161,11 @@ function App() {
       return productMatchesFilters(product, categoryFilters)
     })
   }, [activeCategory, catalog, query, categoryFilters])
+
+  const openProduct = (product: Product, filters?: Record<string, string>) => {
+    setSheetFilters(filters ?? categoryFilters)
+    setSelectedProduct(product)
+  }
 
   const goCatalog = (category = 'Все') => {
     setActiveCategory(category)
@@ -178,6 +212,7 @@ function App() {
           )
       setOrderId(result.id)
       setCart([])
+      setCheckout(emptyCheckout)
       setView('success')
       window.Telegram?.WebApp.HapticFeedback?.notificationOccurred('success')
     } catch (reason) {
@@ -210,8 +245,7 @@ function App() {
 
       <header className="topbar">
         <button className="brand" onClick={() => setView('home')}>
-          <span className="brand-mark">CH</span>
-          <span><strong>CHES</strong><small>HOCKEY STORE</small></span>
+          <img className="brand-logo" src="/logo-header.png" alt="Chesalin Hockey" />
         </button>
         <button className="icon-button" onClick={() => goCatalog()} aria-label="Каталог">
           <Menu size={21} />
@@ -225,7 +259,7 @@ function App() {
           <HomeView
             catalog={catalog}
             onCategory={goCatalog}
-            onProduct={setSelectedProduct}
+            onProduct={(product) => openProduct(product, {})}
             onCatalog={() => goCatalog()}
           />
         ) : view === 'catalog' ? (
@@ -236,7 +270,7 @@ function App() {
             query={query}
             setQuery={setQuery}
             products={visibleProducts}
-            onProduct={setSelectedProduct}
+            onProduct={openProduct}
             filtersOpen={filtersOpen}
             setFiltersOpen={setFiltersOpen}
             filterGroups={filterGroups}
@@ -280,7 +314,8 @@ function App() {
             data={checkout}
             setData={setCheckout}
             cart={cart}
-            total={cartTotal}
+            subtotal={cartTotal}
+            offline={offline}
             submitting={submitting}
             error={error}
             onBack={() => setView('cart')}
@@ -304,7 +339,12 @@ function App() {
         />
       )}
 
-      <ProductSheet product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addToCart} />
+      <ProductSheet
+        product={selectedProduct}
+        preferredFilters={sheetFilters}
+        onClose={() => setSelectedProduct(null)}
+        onAdd={addToCart}
+      />
     </div>
   )
 }
@@ -472,6 +512,7 @@ function CatalogView({
             <strong>Фильтры · {activeCategory}</strong>
             <button onClick={() => setCategoryFilters({})}>Сбросить</button>
           </div>
+          <p className="filters-note">Показываем только варианты в наличии</p>
           {filterGroups.map((group) => (
             <div className="filter-group" key={group.key}>
               <span>{group.label}</span>
@@ -481,13 +522,15 @@ function CatalogView({
                     key={value}
                     className={categoryFilters[group.key] === value ? 'is-selected' : ''}
                     onClick={() =>
-                      setCategoryFilters({
-                        ...categoryFilters,
-                        [group.key]: categoryFilters[group.key] === value ? '' : value,
-                      })
+                      setCategoryFilters(
+                        sanitizeCategoryFilters(activeCategory, catalog.products, {
+                          ...categoryFilters,
+                          [group.key]: categoryFilters[group.key] === value ? '' : value,
+                        }),
+                      )
                     }
                   >
-                    {value}
+                    {formatFilterChipLabel(group.key, value)}
                   </button>
                 ))}
               </div>
@@ -552,7 +595,7 @@ function CartView({
                 <div className="cart-line-info">
                   <span className="eyebrow">{line.product.category}</span>
                   <strong>{line.product.name.replace(/\s[LR](?=\s|$)/, '')}</strong>
-                  <small>{line.variant.label}</small>
+                  <small>{formatVariantLabel(line.variant.label)}</small>
                   <div className="cart-line-bottom">
                     <b>{money.format(line.variant.price * line.quantity)} ₽</b>
                     <div className="mini-stepper">
@@ -589,7 +632,8 @@ function CheckoutView({
   data,
   setData,
   cart,
-  total,
+  subtotal,
+  offline,
   submitting,
   error,
   onBack,
@@ -598,13 +642,63 @@ function CheckoutView({
   data: CheckoutData
   setData: (value: CheckoutData) => void
   cart: CartLine[]
-  total: number
+  subtotal: number
+  offline: boolean
   submitting: boolean
   error: string
   onBack: () => void
   onSubmit: (event: FormEvent) => void
 }) {
+  const [promoInput, setPromoInput] = useState(data.promoCode)
+  const [promoDiscount, setPromoDiscount] = useState(0)
+  const [promoMessage, setPromoMessage] = useState('')
+  const [promoChecking, setPromoChecking] = useState(false)
+
+  useEffect(() => {
+    setPromoDiscount(0)
+    setPromoMessage('')
+    setData({ ...data, promoCode: '' })
+    setPromoInput('')
+  }, [subtotal])
+
+  const payable = Math.max(subtotal - promoDiscount, 0)
   const update = (field: keyof CheckoutData, value: string) => setData({ ...data, [field]: value })
+
+  const applyPromo = async () => {
+    const code = promoInput.trim()
+    if (!code) {
+      setPromoMessage('Введите промокод')
+      setPromoDiscount(0)
+      setData({ ...data, promoCode: '' })
+      return
+    }
+    if (offline) {
+      setPromoMessage('Промокоды недоступны в демо-режиме')
+      return
+    }
+    setPromoChecking(true)
+    setPromoMessage('')
+    try {
+      const result = await validatePromo(code, subtotal)
+      setPromoDiscount(result.discount)
+      setData({ ...data, promoCode: result.code })
+      setPromoMessage(result.discount ? `Скидка −${money.format(result.discount)} ₽` : 'Промокод применён')
+    } catch (reason) {
+      setPromoDiscount(0)
+      setData({ ...data, promoCode: '' })
+      setPromoMessage(reason instanceof Error ? reason.message : 'Промокод не подошёл')
+    } finally {
+      setPromoChecking(false)
+    }
+  }
+
+  const clearPromo = () => {
+    setPromoInput('')
+    setPromoDiscount(0)
+    setPromoMessage('')
+    setData({ ...data, promoCode: '' })
+  }
+
   return (
     <section className="page checkout-page">
       <button className="back-link" onClick={onBack}><ArrowLeft size={18} /> Корзина</button>
@@ -617,12 +711,39 @@ function CheckoutView({
           <label><MapPin size={18} /><span><small>Город</small><input value={data.city} onChange={(e) => update('city', e.target.value)} placeholder="Москва" /></span></label>
         </div>
         <div className="form-card">
-          <h3><span>02</span> Детали</h3>
+          <h3><span>02</span> Промокод</h3>
+          <div className="promo-row">
+            <label className="promo-field">
+              <Tag size={18} />
+              <input
+                value={promoInput}
+                onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                placeholder="Например CHES10"
+                autoCapitalize="characters"
+                disabled={offline}
+              />
+            </label>
+            {data.promoCode ? (
+              <button type="button" className="text-button" onClick={clearPromo}>Сбросить</button>
+            ) : (
+              <button type="button" className="secondary-button" disabled={promoChecking || offline} onClick={applyPromo}>
+                {promoChecking ? '…' : 'Применить'}
+              </button>
+            )}
+          </div>
+          {promoMessage && <p className={`promo-hint ${promoDiscount ? 'is-ok' : ''}`}>{promoMessage}</p>}
+        </div>
+        <div className="form-card">
+          <h3><span>03</span> Детали</h3>
           <label className="comment-field"><MessageCircle size={18} /><span><small>Комментарий</small><textarea value={data.comment} onChange={(e) => update('comment', e.target.value)} placeholder="Размер, доставка, пожелания" rows={4} /></span></label>
         </div>
-        <div className="order-mini-summary">
+        <div className="order-mini-summary checkout-totals">
           <span>{cart.reduce((sum, line) => sum + line.quantity, 0)} товара</span>
-          <strong>{money.format(total)} ₽</strong>
+          <div className="checkout-totals__lines">
+            <div><span>Товары</span><strong>{money.format(subtotal)} ₽</strong></div>
+            {promoDiscount > 0 && <div className="checkout-discount"><span>Скидка</span><strong>−{money.format(promoDiscount)} ₽</strong></div>}
+            <div className="checkout-totals__final"><span>К оплате</span><strong>{money.format(payable)} ₽</strong></div>
+          </div>
         </div>
         {error && <div className="form-error">{error}</div>}
         <button className="primary-button checkout-submit" disabled={submitting || !cart.length}>
@@ -675,12 +796,19 @@ function OrdersView({
   const [detail, setDetail] = useState<OrderDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [cancelling, setCancelling] = useState(false)
+
+  const reloadOrders = () =>
+    loadOrders()
+      .then(setOrders)
+      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Не удалось загрузить заказы'))
 
   useEffect(() => {
     if (offline) {
       setLoading(false)
       return
     }
+    setError('')
     loadOrders()
       .then((items) => {
         setOrders(items)
@@ -698,6 +826,23 @@ function OrdersView({
     loadOrder(orderId).then(setDetail).catch((reason) => {
       setError(reason instanceof Error ? reason.message : 'Заказ не найден')
     })
+  }
+
+  const cancelMyOrder = async () => {
+    if (!detail || !['new', 'contacted'].includes(detail.status)) return
+    if (!window.confirm(`Отменить заказ №${detail.id}?`)) return
+    setCancelling(true)
+    setError('')
+    try {
+      const result = await cancelOrder(detail.id)
+      const next = await loadOrder(detail.id)
+      setDetail({ ...next, status: result.status, statusLabel: result.statusLabel })
+      await reloadOrders()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не удалось отменить заказ')
+    } finally {
+      setCancelling(false)
+    }
   }
 
   return (
@@ -719,12 +864,17 @@ function OrdersView({
           <ul className="order-items">
             {detail.items.map((item) => (
               <li key={`${item.name}-${item.variant}`}>
-                <span>{item.name} · {item.variant}</span>
+                <span>{item.name} · {formatVariantLabel(item.variant)}</span>
                 <span>{item.quantity} × {money.format(item.price)} ₽</span>
               </li>
             ))}
           </ul>
           <div className="order-detail-total"><span>Итого</span><strong>{money.format(detail.total)} ₽</strong></div>
+          {['new', 'contacted'].includes(detail.status) && !offline && (
+            <button className="text-button danger order-cancel" type="button" disabled={cancelling} onClick={cancelMyOrder}>
+              {cancelling ? 'Отменяем…' : 'Отменить заказ'}
+            </button>
+          )}
         </article>
       ) : orders.length ? (
         <div className="order-list">
@@ -756,15 +906,31 @@ function AdminView({
   onCatalogRefresh: () => Promise<void>
 }) {
   const [orders, setOrders] = useState<OrderSummary[]>([])
+  const [promos, setPromos] = useState<PromoCode[]>([])
   const [syncing, setSyncing] = useState(false)
   const [message, setMessage] = useState('')
+  const [promoForm, setPromoForm] = useState({
+    code: '',
+    kind: 'percent' as 'percent' | 'fixed',
+    value: '10',
+    maxUses: '',
+    note: '',
+  })
+  const [promoBusy, setPromoBusy] = useState(false)
 
   const refresh = () => {
     adminLoadOrders().then(setOrders).catch(() => setOrders([]))
   }
 
+  const refreshPromos = () => {
+    adminLoadPromos().then(setPromos).catch(() => setPromos([]))
+  }
+
   useEffect(() => {
-    if (!offline) refresh()
+    if (!offline) {
+      refresh()
+      refreshPromos()
+    }
   }, [offline])
 
   const sync = async () => {
@@ -773,7 +939,13 @@ function AdminView({
     try {
       const result = await adminSyncCatalog()
       await onCatalogRefresh()
-      setMessage(`Синхронизировано: ${formatModelCount(result.products)}, уведомлений о поступлении: ${result.restocked}`)
+      const lines = [
+        result.stickWarnings.length
+          ? `Синхронизировано: ${formatModelCount(result.products)}, поступления: ${result.restocked}. Предупреждения по клюшкам: ${result.stickWarnings.length}`
+          : `Синхронизировано: ${formatModelCount(result.products)}, уведомлений о поступлении: ${result.restocked}`,
+        ...result.stickWarnings.slice(0, 8),
+      ]
+      setMessage(lines.join('\n'))
       refresh()
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : 'Ошибка синхронизации')
@@ -781,6 +953,57 @@ function AdminView({
       setSyncing(false)
     }
   }
+
+  const createPromo = async () => {
+    const code = promoForm.code.trim()
+    const value = Number(promoForm.value)
+    const maxUses = promoForm.maxUses.trim() ? Number(promoForm.maxUses) : null
+    if (!code || !Number.isFinite(value) || value < 1) {
+      setMessage('Укажите код и значение скидки')
+      return
+    }
+    setPromoBusy(true)
+    setMessage('')
+    try {
+      await adminCreatePromo({ code, kind: promoForm.kind, value, maxUses, note: promoForm.note })
+      setPromoForm({ code: '', kind: promoForm.kind, value: promoForm.value, maxUses: '', note: '' })
+      refreshPromos()
+      setMessage('Промокод создан')
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : 'Не удалось создать промокод')
+    } finally {
+      setPromoBusy(false)
+    }
+  }
+
+  const togglePromo = async (promo: PromoCode) => {
+    setPromoBusy(true)
+    try {
+      await adminPatchPromo(promo.code, { active: !promo.active })
+      refreshPromos()
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : 'Ошибка обновления')
+    } finally {
+      setPromoBusy(false)
+    }
+  }
+
+  const removePromo = async (code: string) => {
+    if (!window.confirm(`Удалить промокод ${code}?`)) return
+    setPromoBusy(true)
+    try {
+      await adminDeletePromo(code)
+      refreshPromos()
+      setMessage('Промокод удалён')
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : 'Не удалось удалить')
+    } finally {
+      setPromoBusy(false)
+    }
+  }
+
+  const promoKindLabel = (promo: PromoCode) =>
+    promo.kind === 'percent' ? `${promo.value}%` : `${money.format(promo.value)} ₽`
 
   return (
     <section className="page admin-page">
@@ -793,6 +1016,90 @@ function AdminView({
       </div>
       {message && <p className="admin-message">{message}</p>}
       {offline && <div className="form-error">Админка доступна только при подключённом backend.</div>}
+
+      <div className="admin-promos">
+        <h2>Промокоды</h2>
+        <div className="admin-promo-form form-card">
+          <label>
+            <small>Код</small>
+            <input
+              value={promoForm.code}
+              onChange={(e) => setPromoForm({ ...promoForm, code: e.target.value.toUpperCase() })}
+              placeholder="CHES10"
+              disabled={offline || promoBusy}
+            />
+          </label>
+          <div className="admin-promo-form__row">
+            <label>
+              <small>Тип</small>
+              <select
+                value={promoForm.kind}
+                onChange={(e) => setPromoForm({ ...promoForm, kind: e.target.value as 'percent' | 'fixed' })}
+                disabled={offline || promoBusy}
+              >
+                <option value="percent">Процент</option>
+                <option value="fixed">Фикс. сумма ₽</option>
+              </select>
+            </label>
+            <label>
+              <small>Значение</small>
+              <input
+                inputMode="numeric"
+                value={promoForm.value}
+                onChange={(e) => setPromoForm({ ...promoForm, value: e.target.value })}
+                disabled={offline || promoBusy}
+              />
+            </label>
+            <label>
+              <small>Лимит (пусто = ∞)</small>
+              <input
+                inputMode="numeric"
+                value={promoForm.maxUses}
+                onChange={(e) => setPromoForm({ ...promoForm, maxUses: e.target.value })}
+                placeholder="100"
+                disabled={offline || promoBusy}
+              />
+            </label>
+          </div>
+          <label>
+            <small>Заметка</small>
+            <input
+              value={promoForm.note}
+              onChange={(e) => setPromoForm({ ...promoForm, note: e.target.value })}
+              placeholder="Акция, канал, дата"
+              disabled={offline || promoBusy}
+            />
+          </label>
+          <button className="primary-button" type="button" disabled={offline || promoBusy} onClick={createPromo}>
+            Создать промокод
+          </button>
+        </div>
+        <div className="admin-promo-list">
+          {promos.map((promo) => (
+            <article className={`admin-promo-line ${promo.active ? '' : 'is-off'}`} key={promo.code}>
+              <div className="admin-promo-line__main">
+                <strong>{promo.code}</strong>
+                <span>{promoKindLabel(promo)}</span>
+                <small>
+                  {promo.usedCount}
+                  {promo.maxUses != null ? ` / ${promo.maxUses}` : ''} применений
+                  {promo.note ? ` · ${promo.note}` : ''}
+                </small>
+              </div>
+              <div className="admin-promo-line__actions">
+                <button type="button" className="text-button" disabled={promoBusy} onClick={() => togglePromo(promo)}>
+                  {promo.active ? 'Выключить' : 'Включить'}
+                </button>
+                <button type="button" className="text-button danger" disabled={promoBusy} onClick={() => removePromo(promo.code)}>
+                  Удалить
+                </button>
+              </div>
+            </article>
+          ))}
+          {!promos.length && !offline && <p className="admin-orders-empty">Промокодов пока нет</p>}
+        </div>
+      </div>
+
       <div className="admin-orders">
         <h2>Последние заказы</h2>
         {orders.map((order) => (
@@ -846,7 +1153,9 @@ function BottomNav({
       {isAdmin ? (
         <button className={view === 'admin' ? 'is-active' : ''} onClick={onAdmin}><Settings size={20} /><span>Админ</span></button>
       ) : (
-        <button onClick={onSupport}><MessageCircle size={20} /><span>Написать</span></button>
+        <button className={view === 'orders' ? 'is-active' : ''} onClick={onSupport}>
+          <MessageCircle size={20} /><span>Написать</span>
+        </button>
       )}
     </nav>
   )

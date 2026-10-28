@@ -12,11 +12,27 @@ from app.bot.runtime import TelegramService
 from app.catalog.importer import demo_catalog
 from app.catalog.service import sync_catalog
 from app.config import get_settings
+from sqlalchemy import inspect, text
+
 from app.db import Base, SessionLocal, engine
 from app.integrations.google_sheets import GoogleSheets
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("ches-hockey")
+
+
+def _ensure_sqlite_columns(db_engine) -> None:
+    if not str(db_engine.url).startswith("sqlite"):
+        return
+    inspector = inspect(db_engine)
+    if "orders" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("orders")}
+    with db_engine.begin() as conn:
+        if "promo_code" not in columns:
+            conn.execute(text("ALTER TABLE orders ADD COLUMN promo_code VARCHAR(32) DEFAULT ''"))
+        if "discount" not in columns:
+            conn.execute(text("ALTER TABLE orders ADD COLUMN discount INTEGER DEFAULT 0"))
 
 
 async def refresh_catalog(app: FastAPI) -> None:
@@ -47,6 +63,7 @@ async def lifespan(app: FastAPI):
     from app.models import Product
 
     Base.metadata.create_all(engine)
+    _ensure_sqlite_columns(engine)
     app.state.settings = get_settings()
     app.state.logger = log
     app.state.sheets = GoogleSheets(app.state.settings)

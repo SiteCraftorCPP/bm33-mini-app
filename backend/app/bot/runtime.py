@@ -224,6 +224,25 @@ class TelegramService:
         for chat_id in self.target_chat_ids:
             await self.bot.send_message(chat_id, text, reply_markup=markup)
 
+    async def notify_order_updated(self, order_id: int, *, prefix: str = "") -> None:
+        if self.bot is None:
+            return
+        with SessionLocal() as db:
+            order = db.scalar(
+                select(Order).where(Order.id == order_id).options(selectinload(Order.items))
+            )
+            if order is None:
+                return
+            body = format_order_text(order)
+            text = f"{prefix}\n\n{body}" if prefix else body
+            markup = order_action_markup(
+                order_id,
+                order.status,
+                self.settings.public_webapp_url,
+            )
+        for chat_id in self.target_chat_ids:
+            await self.bot.send_message(chat_id, text, reply_markup=markup)
+
     async def notify_restock(self, variant_ids: list[str]) -> None:
         if self.bot is None or not variant_ids:
             return

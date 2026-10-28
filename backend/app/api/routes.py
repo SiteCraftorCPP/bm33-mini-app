@@ -2,17 +2,21 @@ from __future__ import annotations
 
 from collections import Counter
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.auth import TelegramIdentity, current_user, require_admin
+from app.catalog.importer import CatalogDataError, stick_catalog_warnings
 from app.catalog.service import catalog_payload, sync_catalog
 from app.db import get_db
 from app.integrations.google_sheets import GoogleSheets, SheetsError
+from app.models import PromoCode
+from app.orders.status import OrderStatusError, cancel_order_by_customer
 from app.orders.stock import available_units
+from app.promos.service import PromoError, apply_promo, normalize_code, preview_promo, promo_to_dict
 from app.models import Order, OrderItem, Product, RestockSubscription, Variant
 
 router = APIRouter(prefix="/api")
@@ -48,6 +52,26 @@ class OrderRequest(BaseModel):
     city: str = Field(default="", max_length=120)
     delivery: str = Field(default="", max_length=80)
     comment: str = Field(default="", max_length=1500)
+    promoCode: str = Field(default="", max_length=32)
+
+
+class PromoValidateRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=32)
+    subtotal: int = Field(ge=1)
+
+
+class PromoCreateRequest(BaseModel):
+    code: str = Field(min_length=2, max_length=32)
+    kind: str = Field(pattern="^(percent|fixed)$")
+    value: int = Field(ge=1, le=1_000_000)
+    maxUses: int | None = Field(default=None, ge=1, le=1_000_000)
+    note: str = Field(default="", max_length=200)
+
+
+class PromoPatchRequest(BaseModel):
+    active: bool | None = None
+    maxUses: int | None = Field(default=None, ge=1, le=1_000_000)
+    note: str | None = Field(default=None, max_length=200)
 
 
 class SubscriptionRequest(BaseModel):
@@ -128,7 +152,16 @@ async def create_order(
                 detail=f"«{variant.product.name}»: доступно только {free} шт.",
             )
 
-    total = sum(by_id[variant_id].price * quantity for variant_id, quantity in quantities.items())
+    subtotal = sum(by_id[variant_id].price * quantity for variant_id, quantity in quantities.items())
+    discount = 0
+    promo_code = ""
+    if payload.promoCode.strip() and not demo_order:
+        try:
+            promo, discount = apply_promo(db, payload.promoCode, subtotal)
+            promo_code = promo.code
+        except PromoError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    total = max(subtotal - discount, 0)
     order = Order(
         telegram_user_id=user.id,
         telegram_username=user.username,
@@ -137,6 +170,8 @@ async def create_order(
         city=payload.city.strip(),
         delivery=payload.delivery.strip(),
         comment=payload.comment.strip(),
+        promo_code=promo_code,
+        discount=discount,
         total=total,
     )
     db.add(order)
@@ -164,6 +199,23 @@ async def create_order(
         request.app.state.logger.exception("order notification failed", extra={"order_id": order.id})
 
     return {"id": order.id, "status": order.status, "total": order.total}
+
+
+@router.post("/promos/validate")
+def validate_promo_code(
+    payload: PromoValidateRequest,
+    user: TelegramIdentity = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    try:
+        promo, discount = preview_promo(db, payload.code, payload.subtotal)
+    except PromoError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "code": promo.code,
+        "discount": discount,
+        "total": max(payload.subtotal - discount, 0),
+    }
 
 
 @router.post("/subscriptions", status_code=status.HTTP_201_CREATED)
@@ -252,6 +304,37 @@ def order_status(
     }
 
 
+@router.post("/orders/{order_id}/cancel")
+async def cancel_my_order(
+    order_id: int,
+    request: Request,
+    user: TelegramIdentity = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    if user.is_demo:
+        raise HTTPException(status_code=400, detail="Демо-заказ нельзя отменить на сервере")
+    try:
+        order = await cancel_order_by_customer(
+            db,
+            order_id=order_id,
+            telegram_user_id=user.id,
+        )
+    except OrderStatusError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        await request.app.state.telegram.notify_order_updated(
+            order.id,
+            prefix="❌ Клиент отменил заказ",
+        )
+    except Exception:
+        request.app.state.logger.exception("order cancel notify failed", extra={"order_id": order.id})
+    return {
+        "id": order.id,
+        "status": order.status,
+        "statusLabel": ORDER_STATUS_LABELS.get(order.status, order.status),
+    }
+
+
 @router.get("/admin/orders")
 def admin_orders(
     user: TelegramIdentity = Depends(require_admin),
@@ -298,4 +381,78 @@ async def admin_catalog_sync(
             detail="Сервер не может прочитать ключ Google Sheets (права файла).",
         ) from exc
     restocked = sync_catalog(db, imported)
-    return {"ok": True, "products": len(imported), "restocked": len(restocked)}
+    stick_warnings = stick_catalog_warnings(imported)
+    return {
+        "ok": True,
+        "products": len(imported),
+        "restocked": len(restocked),
+        "stickWarnings": stick_warnings,
+    }
+
+
+@router.get("/admin/promos")
+def admin_list_promos(
+    user: TelegramIdentity = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    promos = db.scalars(select(PromoCode).order_by(PromoCode.created_at.desc())).all()
+    return {"promos": [promo_to_dict(promo) for promo in promos]}
+
+
+@router.post("/admin/promos", status_code=status.HTTP_201_CREATED)
+def admin_create_promo(
+    payload: PromoCreateRequest,
+    user: TelegramIdentity = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    code = normalize_code(payload.code)
+    if db.get(PromoCode, code):
+        raise HTTPException(status_code=409, detail="Такой промокод уже есть")
+    if payload.kind == "percent" and payload.value > 100:
+        raise HTTPException(status_code=400, detail="Процент не может быть больше 100")
+    promo = PromoCode(
+        code=code,
+        kind=payload.kind,
+        value=payload.value,
+        max_uses=payload.maxUses,
+        note=payload.note.strip(),
+    )
+    db.add(promo)
+    db.commit()
+    db.refresh(promo)
+    return promo_to_dict(promo)
+
+
+@router.patch("/admin/promos/{code}")
+def admin_patch_promo(
+    code: str,
+    payload: PromoPatchRequest,
+    user: TelegramIdentity = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    promo = db.get(PromoCode, normalize_code(code))
+    if promo is None:
+        raise HTTPException(status_code=404, detail="Промокод не найден")
+    if payload.active is not None:
+        promo.active = payload.active
+    if payload.maxUses is not None:
+        promo.max_uses = payload.maxUses
+    if payload.note is not None:
+        promo.note = payload.note.strip()
+    db.commit()
+    db.refresh(promo)
+    return promo_to_dict(promo)
+
+
+@router.delete("/admin/promos/{code}", status_code=status.HTTP_204_NO_CONTENT)
+def admin_delete_promo(
+    code: str,
+    user: TelegramIdentity = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> Response:
+    promo = db.get(PromoCode, normalize_code(code))
+    if promo is None:
+        raise HTTPException(status_code=404, detail="Промокод не найден")
+    db.delete(promo)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

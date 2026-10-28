@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 640" role="img" aria-label="Chesalin Hockey">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#051221"/>
+      <stop offset="55%" stop-color="#0b3f7a"/>
+      <stop offset="100%" stop-color="#1261ac"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="640" fill="url(#g)"/>
+  <circle cx="1180" cy="120" r="280" fill="rgba(255,255,255,0.06)"/>
+  <circle cx="1320" cy="520" r="220" fill="rgba(237,45,63,0.18)"/>
+  <path d="M0 520 Q400 420 800 500 T1600 460 L1600 640 L0 640 Z" fill="rgba(255,255,255,0.08)"/>
+  <text x="96" y="280" fill="#ffffff" font-family="Arial,sans-serif" font-size="92" font-weight="700">Chesalin Hockey</text>
+  <text x="98" y="360" fill="rgba(255,255,255,0.82)" font-family="Arial,sans-serif" font-size="42">-:8?8@>2:0 2 =0;8G88</text>
+</svg>

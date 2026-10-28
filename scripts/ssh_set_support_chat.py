@@ -8,7 +8,7 @@ from pathlib import Path
 import paramiko
 
 ROOT = Path(__file__).resolve().parents[1]
-CHAT_ID = sys.argv[1] if len(sys.argv) > 1 else "-1004387232874"
+CHAT_ID = sys.argv[1] if len(sys.argv) > 1 else "-1004378468284"
 
 text = (ROOT / "pas bm33 mini app.txt").read_text(encoding="utf-8")
 host = re.search(r"хост:\s*([0-9.]+)\s*/\s*(\S+)", text, re.I)

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Bell, Check, ChevronLeft, Minus, Plus, ShoppingBag, X } from 'lucide-react'
 import { subscribeToRestock } from '../api'
+import { pickVariantForFilters } from '../catalogFilters'
+import { formatGripValue } from '../gripLabel'
 import type { Product, Variant } from '../types'
 import { ProductVisual } from './ProductVisual'
 
@@ -10,17 +12,22 @@ const unique = (items: string[]) => [...new Set(items.filter(Boolean))]
 
 export function ProductSheet({
   product,
+  preferredFilters,
   onClose,
   onAdd,
 }: {
   product: Product | null
+  preferredFilters?: Record<string, string>
   onClose: () => void
   onAdd: (product: Product, variant: Variant, quantity: number) => void
 }) {
-  const firstVariant = useMemo(
-    () => product?.variants.find((variant) => variant.stock > 0) ?? product?.variants[0],
-    [product],
-  )
+  const firstVariant = useMemo(() => {
+    if (!product) return undefined
+    if (preferredFilters && Object.values(preferredFilters).some(Boolean)) {
+      return pickVariantForFilters(product, preferredFilters)
+    }
+    return product.variants.find((variant) => variant.stock > 0) ?? product.variants[0]
+  }, [product, preferredFilters])
   const [selected, setSelected] = useState<Variant | undefined>(firstVariant)
   const [quantity, setQuantity] = useState(1)
   const [subscribed, setSubscribed] = useState(false)
@@ -49,6 +56,9 @@ export function ProductSheet({
     setQuantity(1)
   }
 
+  const displayOptionValue = (field: 'option1Value' | 'option2Value' | 'side', value: string) =>
+    field === 'side' ? formatGripValue(value) : value
+
   const optionGroup = (
     title: string,
     values: string[],
@@ -58,7 +68,7 @@ export function ProductSheet({
       <div className="option-group">
         <div className="option-label">
           <span>{title}</span>
-          <strong>{selected[field]}</strong>
+          <strong>{displayOptionValue(field, selected[field])}</strong>
         </div>
         <div className="option-pills">
           {values.map((value) => {
@@ -70,7 +80,7 @@ export function ProductSheet({
                 className={`${selected[field] === value ? 'is-selected' : ''} ${available ? '' : 'is-unavailable'}`}
                 onClick={() => choose(field, value)}
               >
-                {value}
+                {displayOptionValue(field, value)}
               </button>
             )
           })}
@@ -112,7 +122,7 @@ export function ProductSheet({
 
           {optionGroup(selected.option1Name || 'Вариант', option1Values, 'option1Value')}
           {optionGroup(selected.option2Name || 'Параметр', option2Values, 'option2Value')}
-          {optionGroup('Сторона', sides, 'side')}
+          {optionGroup('Хват', sides, 'side')}
 
           <div className={`availability-card ${selected.stock ? '' : 'is-empty'}`}>
             <span>{selected.stock ? <Check size={16} /> : <Bell size={16} />}</span>

@@ -129,6 +129,25 @@ main {
   clip-path: polygon(9% 0, 100% 0, 91% 100%, 0 100%);
 }
 
+.brand-logo {
+  display: block;
+  height: 46px;
+  width: auto;
+  max-width: min(52vw, 200px);
+  object-fit: contain;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.brand-title {
+  font-family: 'Russo One', sans-serif;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  max-width: 9.5rem;
+}
+
 .brand > span:last-child {
   display: flex;
   flex-direction: column;
@@ -167,9 +186,8 @@ main {
   overflow: hidden;
   color: white;
   background:
-    linear-gradient(90deg, rgba(5, 18, 33, 0.98) 0%, rgba(5, 22, 42, 0.9) 45%, rgba(7, 34, 62, 0.3) 100%),
-    linear-gradient(145deg, transparent 40%, rgba(18, 97, 172, 0.4)),
-    url('https://images.unsplash.com/photo-1580748141549-71748dbe0bdc?auto=format&fit=crop&w=1200&q=86') center 35% / cover;
+    linear-gradient(90deg, rgba(5, 18, 33, 0.88) 0%, rgba(5, 22, 42, 0.5) 45%, rgba(7, 34, 62, 0.2) 100%),
+    url('/baner.jpg') center center / cover;
   border-radius: 0 0 30px 30px;
   box-shadow: 0 24px 55px rgba(7, 28, 51, 0.24);
 }
@@ -855,6 +873,18 @@ main {
   background: none;
   font-size: var(--text-caption);
   font-weight: 700;
+}
+
+.filters-note {
+  margin: -6px 0 12px;
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+
+.order-cancel {
+  margin-top: 12px;
+  width: 100%;
+  justify-content: center;
 }
 
 .filter-group + .filter-group {
@@ -1952,6 +1982,7 @@ main {
   color: #0c6245;
   font-size: 13px;
   font-weight: 700;
+  white-space: pre-line;
 }
 
 .admin-orders h2 {
@@ -1998,6 +2029,137 @@ main {
   margin: 0;
   color: var(--muted);
   font-size: var(--text-caption);
+}
+
+.promo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.promo-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.promo-field input {
+  flex: 1;
+  min-width: 0;
+}
+
+.promo-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.promo-hint.is-ok {
+  color: #0c6245;
+  font-weight: 700;
+}
+
+.checkout-totals {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.checkout-totals__lines {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  font-size: 14px;
+}
+
+.checkout-totals__lines > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.checkout-discount strong {
+  color: #0c6245;
+}
+
+.checkout-totals__final {
+  padding-top: 6px;
+  border-top: 1px solid #e8edf3;
+  font-weight: 800;
+}
+
+.secondary-button {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid #c6d5e3;
+  background: #fff;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.admin-promos {
+  margin-bottom: 24px;
+}
+
+.admin-promos h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.admin-promo-form {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.admin-promo-form label {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-promo-form__row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-promo-line {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e8edf3;
+}
+
+.admin-promo-line.is-off {
+  opacity: 0.55;
+}
+
+.admin-promo-line__main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-promo-line__main small {
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+
+.admin-promo-line__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.text-button.danger {
+  color: #b42318;
 }
 
 @media (hover: hover) {

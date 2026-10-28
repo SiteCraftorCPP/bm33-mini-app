@@ -94,7 +94,7 @@ def canonical_product_name(name: str, category: str) -> str:
     cleaned = unicodedata.normalize("NFKC", name or "").strip()
     if category in {"Клюшки", "Вратарские"}:
         cleaned = re.sub(r"\s+\((?:левая|правая)\)\s*$", "", cleaned, flags=re.IGNORECASE)
-        cleaned = re.sub(r"\s+[LR](?=\s*(?:\(|$))", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s+[LR]\s*$", "", cleaned, flags=re.IGNORECASE)
     return re.sub(r"\s{2,}", " ", cleaned).strip()
 
 
@@ -210,12 +210,13 @@ def parse_sheet(csv_text: str, definition: SheetDefinition, sort_offset: int = 0
         if raw_name:
             previous_name = raw_name
             category = _category(definition, raw_name)
+            display_name = canonical_product_name(raw_name, category)
             image_raw = ""
             if definition.image_column is not None:
                 image_raw = _cell(row, definition.image_column)
             current = ImportedProduct(
                 id=stable_product_id(category, raw_name),
-                name=raw_name,
+                name=display_name,
                 category=category,
                 sort_order=sort_offset + len(products),
                 image_url=normalize_image_url(image_raw),
@@ -269,6 +270,44 @@ def parse_sheet(csv_text: str, definition: SheetDefinition, sort_offset: int = 0
         )
 
     return [product for product in products if product.variants]
+
+
+def stick_catalog_warnings(imported: list[ImportedProduct]) -> list[str]:
+    """Предупреждения по названиям клюшек (левая/правая вкладка, Pro, хват)."""
+    raw_names: dict[str, set[str]] = {}
+    sides: dict[str, set[str]] = {}
+    ids_by_fuzzy: dict[str, set[str]] = {}
+
+    for product in imported:
+        if product.category != "Клюшки":
+            continue
+        canon = canonical_product_name(product.name, "Клюшки")
+        raw_names.setdefault(canon, set()).add(product.name.strip())
+        fuzzy = re.sub(r"\s+pro\s*$", "", canon, flags=re.IGNORECASE).strip()
+        ids_by_fuzzy.setdefault(fuzzy, set()).add(product.id)
+        for variant in product.variants:
+            if variant.side:
+                sides.setdefault(canon, set()).add(variant.side.upper())
+
+    warnings: list[str] = []
+    for fuzzy, ids in sorted(ids_by_fuzzy.items()):
+        if len(ids) > 1:
+            warnings.append(
+                f"«{fuzzy}»: в каталоге {len(ids)} разных карточки — "
+                "на левой и правой вкладке должно быть одно имя (например, оба с «Pro»)"
+            )
+    for canon, names in sorted(raw_names.items()):
+        if len(names) > 1:
+            warnings.append(
+                f"«{canon}»: разные подписи ({', '.join(sorted(names))}) — "
+                "выровняйте название на обеих вкладках"
+            )
+        hand = sides.get(canon, set())
+        if hand == {"L"}:
+            warnings.append(f"«{canon}»: только левый хват — нет строк на «Клюшки правые»?")
+        elif hand == {"R"}:
+            warnings.append(f"«{canon}»: только правый хват — нет строк на «Клюшки левые»?")
+    return warnings
 
 
 def demo_catalog() -> list[ImportedProduct]:
