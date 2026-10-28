@@ -246,12 +246,13 @@ function App() {
         <button className="brand" onClick={() => setView('home')}>
           <img className="brand-logo" src="/logo-header.png" alt="Chesalin Hockey" />
         </button>
-        <button className="icon-button" onClick={() => goCatalog()} aria-label="Каталог">
-          <Menu size={21} />
-        </button>
+        <div className="topbar-actions">
+          <HomeScreenInstallBar />
+          <button className="icon-button" onClick={() => goCatalog()} aria-label="Каталог">
+            <Menu size={21} />
+          </button>
+        </div>
       </header>
-
-      <HomeScreenInstallBar />
 
       <main>
         {loading ? (

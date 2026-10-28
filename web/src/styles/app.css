@@ -133,19 +133,38 @@ main {
   display: block;
   height: 46px;
   width: auto;
-  max-width: min(52vw, 200px);
+  max-width: min(42vw, 168px);
   object-fit: contain;
   border-radius: 0;
   box-shadow: none;
   background: transparent;
 }
 
-.brand-title {
-  font-family: 'Russo One', sans-serif;
-  font-size: 15px;
+.topbar-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.home-install-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 11px;
+  color: var(--blue);
+  border: 1px solid #c5daf0;
+  border-radius: 999px;
+  background: #eef5ff;
+  font-size: 11px;
+  font-weight: 800;
   letter-spacing: 0.02em;
-  line-height: 1.15;
-  max-width: 9.5rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.home-install-chip svg {
+  flex-shrink: 0;
 }
 
 .brand > span:last-child {
@@ -2125,55 +2144,6 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.home-install {
-  margin: 0 12px 10px;
-  position: sticky;
-  top: 0;
-  z-index: 5;
-}
-
-.home-install__button {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 14px 16px;
-  text-align: left;
-  color: var(--ink);
-  border: 1px solid #c5daf0;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #edf5ff 0%, #f8fbff 100%);
-  cursor: pointer;
-}
-
-.home-install__icon {
-  display: grid;
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  color: var(--blue);
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 8px 20px rgba(15, 39, 68, 0.08);
-}
-
-.home-install__copy {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.home-install__copy strong {
-  font-size: 15px;
-}
-
-.home-install__copy small {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.35;
 }
 
 @media (min-width: 560px) {

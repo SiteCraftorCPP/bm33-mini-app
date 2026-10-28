@@ -8,16 +8,15 @@ export function HomeScreenInstallBar() {
   if (state !== 'show') return null
 
   return (
-    <section className="home-install" aria-label="Ярлык на главный экран">
-      <button type="button" className="home-install__button" onClick={install}>
-        <span className="home-install__icon" aria-hidden>
-          <PlusSquare size={22} />
-        </span>
-        <span className="home-install__copy">
-          <strong>Добавить на главный экран</strong>
-          <small>Telegram покажет системный диалог «Создать ярлык»</small>
-        </span>
-      </button>
-    </section>
+    <button
+      type="button"
+      className="home-install-chip"
+      onClick={install}
+      aria-label="Добавить магазин на главный экран"
+      title="Создать ярлык на рабочем столе"
+    >
+      <PlusSquare size={15} strokeWidth={2.25} />
+      <span>Ярлык</span>
+    </button>
   )
 }
