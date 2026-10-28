@@ -150,21 +150,49 @@ def stable_variant_id(
     )
 
 
-def normalize_image_url(raw: str) -> str:
+def extract_drive_file_id(raw: str) -> str | None:
     url = (raw or "").strip()
     if not url:
-        return ""
-    file_id = None
+        return None
     match = re.search(r"drive\.google\.com/file/d/([^/]+)", url, flags=re.I)
     if match:
-        file_id = match.group(1)
-    else:
-        match = re.search(r"[?&]id=([^&]+)", url, flags=re.I)
-        if match and "drive.google" in url.casefold():
-            file_id = match.group(1)
+        return match.group(1)
+    match = re.search(r"[?&]id=([^&]+)", url, flags=re.I)
+    if match and "drive.google" in url.casefold():
+        return match.group(1)
+    if re.fullmatch(r"[\w-]{20,}", url):
+        return url
+    return None
+
+
+def normalize_image_url(raw: str) -> str:
+    text = (raw or "").strip()
+    if not text:
+        return ""
+
+    image_formula = re.search(r'=IMAGE\s*\(\s*"([^"]+)"', text, flags=re.I)
+    if image_formula:
+        text = image_formula.group(1).strip()
+    hyperlink = re.search(r'HYPERLINK\s*\(\s*"([^"]+)"', text, flags=re.I)
+    if hyperlink:
+        text = hyperlink.group(1).strip()
+
+    file_id = extract_drive_file_id(text)
     if file_id:
-        return f"https://drive.google.com/uc?export=view&id={file_id}"
-    return url
+        return f"https://drive.google.com/thumbnail?id={file_id}&sz=w1600"
+    return text
+
+
+def drive_image_fetch_urls(stored: str) -> list[str]:
+    """Try thumbnail first, then full file — avoids HTML previews from /uc."""
+    file_id = extract_drive_file_id(stored)
+    if file_id:
+        return [
+            f"https://drive.google.com/thumbnail?id={file_id}&sz=w1600",
+            f"https://drive.google.com/uc?export=download&id={file_id}",
+            f"https://drive.google.com/uc?export=view&id={file_id}",
+        ]
+    return [stored.strip()] if stored.strip() else []
 
 
 def _number(value: str) -> int | None:

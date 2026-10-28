@@ -439,9 +439,34 @@ main {
 }
 
 .product-visual > img:not(.product-category-icon) {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.product-visual.has-photo {
+  background: #f3f6f9;
+}
+
+.product-visual.has-photo::before {
+  display: none;
+}
+
+.product-visual.has-photo > img:not(.product-category-icon) {
+  object-fit: contain;
+  object-position: center;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.sheet-visual .product-visual.has-photo {
+  height: 290px;
+}
+
+.sheet-visual .product-visual.has-photo > img:not(.product-category-icon) {
+  padding: 14px 16px;
 }
 
 .visual-glow {

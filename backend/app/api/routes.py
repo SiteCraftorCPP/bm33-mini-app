@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.auth import TelegramIdentity, current_user, require_admin
-from app.catalog.importer import CatalogDataError, stick_catalog_warnings
+from app.catalog.importer import CatalogDataError, drive_image_fetch_urls, stick_catalog_warnings
 from app.catalog.service import catalog_payload, sync_catalog
 from app.db import get_db
 from app.integrations.google_sheets import GoogleSheets, SheetsError
@@ -112,15 +112,31 @@ def catalog_product_image(product_id: str, db: Session = Depends(get_db)) -> Res
     source = (product.image_url or "").strip()
     if not source:
         raise HTTPException(status_code=404, detail="No image")
+    upstream = None
+    last_error: Exception | None = None
     try:
         with httpx.Client(timeout=25.0, follow_redirects=True, headers=_DRIVE_IMAGE_HEADERS) as client:
-            upstream = client.get(source)
-            upstream.raise_for_status()
+            for candidate in drive_image_fetch_urls(source):
+                try:
+                    response = client.get(candidate)
+                    response.raise_for_status()
+                except httpx.HTTPError as exc:
+                    last_error = exc
+                    continue
+                content_type = response.headers.get("content-type", "")
+                if not content_type.casefold().startswith("image/"):
+                    last_error = httpx.HTTPError(f"Not an image: {content_type}")
+                    continue
+                if len(response.content) < 512:
+                    last_error = httpx.HTTPError("Image too small")
+                    continue
+                upstream = response
+                break
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail="Image fetch failed") from exc
+    if upstream is None:
+        raise HTTPException(status_code=502, detail="Image fetch failed") from last_error
     content_type = upstream.headers.get("content-type", "image/jpeg")
-    if not content_type.casefold().startswith("image/"):
-        raise HTTPException(status_code=502, detail="Invalid image response")
     return Response(
         content=upstream.content,
         media_type=content_type.split(";")[0].strip(),

@@ -41,7 +41,7 @@ def test_catalog_image_proxy(monkeypatch) -> None:
     class FakeResponse:
         status_code = 200
         headers = {"content-type": "image/jpeg"}
-        content = b"\xff\xd8\xff"
+        content = b"\xff\xd8\xff" + (b"\x00" * 600)
 
         def raise_for_status(self) -> None:
             return None
