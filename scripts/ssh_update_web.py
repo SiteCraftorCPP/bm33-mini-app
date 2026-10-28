@@ -24,9 +24,9 @@ chmod 750 /etc/ches-hockey
 chown root:www-data /etc/ches-hockey/env /etc/ches-hockey/google-service-account.json
 chmod 640 /etc/ches-hockey/env /etc/ches-hockey/google-service-account.json
 systemctl restart ches-hockey-api
-sleep 3
+sleep 8
 systemctl is-active ches-hockey-api
-curl -sS http://127.0.0.1:8000/api/health
+curl -sS --retry 3 --retry-delay 2 http://127.0.0.1:8000/api/health
 echo OK
 """
 
