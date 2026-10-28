@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./ches_hockey.sqlite3"
     frontend_url: str = "http://localhost:5173"
     public_webapp_url: str = "http://localhost:5173"
+    webapp_cache_version: str = "1"
     demo_mode: bool = True
 
     bot_token: str = ""
@@ -39,6 +40,18 @@ class Settings(BaseSettings):
     def support_chat_id_int(self) -> int | None:
         value = self.support_chat_id.strip()
         return int(value) if value.lstrip("-").isdigit() else None
+
+    @property
+    def webapp_base_url(self) -> str:
+        return self.public_webapp_url.split("?")[0].rstrip("/")
+
+    @property
+    def webapp_launch_url(self) -> str:
+        base = f"{self.webapp_base_url}/"
+        version = self.webapp_cache_version.strip()
+        if not version:
+            return base
+        return f"{base}?v={version}"
 
     @property
     def manager_telegram_url(self) -> str:

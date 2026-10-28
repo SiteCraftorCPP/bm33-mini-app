@@ -380,7 +380,6 @@ function HomeView({
             Смотреть каталог <ArrowRight size={18} />
           </button>
         </div>
-        <div className="hero-stripe" />
       </section>
 
       {showShortcut && (

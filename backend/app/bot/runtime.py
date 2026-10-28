@@ -144,7 +144,7 @@ class TelegramService:
                     markup = order_action_markup(
                         order_id,
                         order.status,
-                        self.settings.public_webapp_url,
+                        self.settings.webapp_base_url,
                     )
                     if call.message:
                         await call.message.edit_text(card_text, reply_markup=markup)
@@ -168,7 +168,7 @@ class TelegramService:
                             f"Заказ №{order_id} принят. Спасибо за заказ!",
                             reply_markup=user_accepted_markup(
                                 order_id,
-                                self.settings.public_webapp_url,
+                                self.settings.webapp_base_url,
                             ),
                         )
                     except Exception:
@@ -189,7 +189,7 @@ class TelegramService:
             await self.bot.set_chat_menu_button(
                 menu_button=MenuButtonWebApp(
                     text="🛒 Магазин",
-                    web_app=WebAppInfo(url=self.settings.public_webapp_url),
+                    web_app=WebAppInfo(url=self.settings.webapp_launch_url),
                 )
             )
         except Exception:
@@ -219,7 +219,7 @@ class TelegramService:
             markup = order_action_markup(
                 order_id,
                 order.status,
-                self.settings.public_webapp_url,
+                self.settings.webapp_base_url,
             )
         for chat_id in self.target_chat_ids:
             await self.bot.send_message(chat_id, text, reply_markup=markup)
@@ -238,7 +238,7 @@ class TelegramService:
             markup = order_action_markup(
                 order_id,
                 order.status,
-                self.settings.public_webapp_url,
+                self.settings.webapp_base_url,
             )
         for chat_id in self.target_chat_ids:
             await self.bot.send_message(chat_id, text, reply_markup=markup)
@@ -267,7 +267,7 @@ class TelegramService:
                                 [
                                     InlineKeyboardButton(
                                         text="Открыть магазин",
-                                        web_app=WebAppInfo(url=self.settings.public_webapp_url),
+                                        web_app=WebAppInfo(url=self.settings.webapp_launch_url),
                                     )
                                 ]
                             ]
@@ -283,7 +283,7 @@ class TelegramService:
             [
                 InlineKeyboardButton(
                     text="🛒 Открыть магазин",
-                    web_app=WebAppInfo(url=self.settings.public_webapp_url),
+                    web_app=WebAppInfo(url=self.settings.webapp_launch_url),
                 )
             ],
         ]
@@ -298,7 +298,7 @@ class TelegramService:
                 [
                     InlineKeyboardButton(
                         text="🛒 Вернуться в магазин",
-                        web_app=WebAppInfo(url=self.settings.public_webapp_url),
+                        web_app=WebAppInfo(url=self.settings.webapp_launch_url),
                     )
                 ]
             ]
