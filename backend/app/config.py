@@ -47,11 +47,8 @@ class Settings(BaseSettings):
 
     @property
     def webapp_launch_url(self) -> str:
-        base = f"{self.webapp_base_url}/"
-        version = self.webapp_cache_version.strip()
-        if not version:
-            return base
-        return f"{base}?v={version}"
+        """Telegram may strip query strings from menu URLs — use /app/ path."""
+        return f"{self.webapp_base_url}/app/"
 
     @property
     def manager_telegram_url(self) -> str:

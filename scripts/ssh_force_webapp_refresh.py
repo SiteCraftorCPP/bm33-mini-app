@@ -25,6 +25,9 @@ token = token_m.group(1)
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 client.connect(host_m.group(1), username="root", password=host_m.group(2), timeout=30)
+sftp = client.open_sftp()
+sftp.put(str(ROOT / "deploy" / "nginx-ches-hockey.conf"), "/etc/nginx/sites-available/ches-hockey")
+sftp.close()
 
 
 def run(cmd: str, timeout: int = 600) -> tuple[int, str]:
@@ -56,7 +59,7 @@ if code != 0:
     client.close()
     sys.exit(code)
 
-launch_url = f"https://{domain}/?v={VERSION}"
+launch_url = f"https://{domain}/app/"
 menu_payload = json.dumps(
     {
         "menu_button": {
@@ -79,7 +82,7 @@ with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/getChatMenuBut
     print("getChatMenuButton:", resp.read().decode())
 
 _, verify = run(
-    f"curl -sS 'https://{domain}/?v={VERSION}' | grep -E 'index-|Chesalin' | head -3; "
+    f"curl -sS 'https://{domain}/app/' | grep -E 'index-|Chesalin' | head -3; "
     f"ls /opt/bm33-mini-app/web/dist/assets/*.js"
 )
 print(verify)
