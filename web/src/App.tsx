@@ -18,7 +18,6 @@ import {
   Settings,
   ShieldCheck,
   ShoppingBag,
-  Smartphone,
   SlidersHorizontal,
   Tag,
   Trash2,
@@ -48,7 +47,7 @@ import { CategoryIcon } from './components/CategoryIcon'
 import { ProductCard } from './components/ProductCard'
 import { ProductSheet } from './components/ProductSheet'
 import { ProductVisual } from './components/ProductVisual'
-import { checkHomeScreenStatus, homeScreenSupported, requestAddToHomeScreen } from './homeScreen'
+import { maybePromptHomeScreen } from './homeScreen'
 import type {
   CartLine,
   Catalog,
@@ -360,42 +359,28 @@ function HomeView({
   onProduct: (product: Product) => void
   onCatalog: () => void
 }) {
-  const [showShortcut, setShowShortcut] = useState(homeScreenSupported())
-
   useEffect(() => {
-    if (!homeScreenSupported()) return
-    checkHomeScreenStatus().then((status) => {
-      if (status === 'added') setShowShortcut(false)
-    })
+    maybePromptHomeScreen()
   }, [])
 
   return (
     <>
       <section className="hero">
-        <button type="button" className="hero-button" onClick={onCatalog}>
-          Смотреть каталог <ArrowRight size={18} />
+        <button type="button" className="hero-hit" onClick={onCatalog} aria-label="Смотреть каталог">
+          <picture>
+            <source type="image/webp" srcSet="/baner.webp 1x, /baner@2x.webp 2x" />
+            <img
+              src="/baner.jpg"
+              srcSet="/baner.jpg 1x, /baner@2x.jpg 2x"
+              alt="Chesalin Hockey — каталог экипировки"
+              width={960}
+              height={1280}
+              decoding="async"
+              fetchPriority="high"
+            />
+          </picture>
         </button>
       </section>
-
-      {showShortcut && (
-        <section className="home-shortcut">
-          <button
-            type="button"
-            className="home-shortcut__button"
-            onClick={() => {
-              requestAddToHomeScreen()
-              window.Telegram?.WebApp.HapticFeedback?.impactOccurred('light')
-            }}
-          >
-            <Smartphone size={20} />
-            <span>
-              <strong>Ярлык на главный экран</strong>
-              <small>Быстрый вход в магазин, как отдельное приложение</small>
-            </span>
-          </button>
-          <p className="home-shortcut__hint">Или меню ⋮ в Telegram → «Создать ярлык»</p>
-        </section>
-      )}
 
       <section className="content-section category-section">
         <div className="section-heading">

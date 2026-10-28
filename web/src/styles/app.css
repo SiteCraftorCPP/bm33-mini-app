@@ -180,79 +180,27 @@ main {
 }
 
 .hero {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  min-height: clamp(340px, 78vw, 520px);
   margin: 0 12px;
-  padding: 0 20px 22px;
   overflow: hidden;
-  background: url('/baner.jpg') center top / cover no-repeat;
   border-radius: 0 0 30px 30px;
   box-shadow: 0 24px 55px rgba(7, 28, 51, 0.24);
 }
 
-.hero::before {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(0deg, rgba(3, 13, 25, 0.5) 0%, transparent 42%);
-  content: '';
-  pointer-events: none;
-}
-
-.hero-button {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 18px;
-  padding: 16px 19px;
-  color: white;
-  border: 0;
-  background: var(--red);
-  font-size: var(--text-label);
-  font-weight: 800;
-  cursor: pointer;
-  clip-path: polygon(0 0, 94% 0, 100% 50%, 94% 100%, 0 100%);
-}
-
-.home-shortcut {
-  margin: 0 16px 18px;
-  padding: 14px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #e8f2ff 0%, #f6f9fc 100%);
-  border: 1px solid #d8e6f5;
-}
-
-.home-shortcut__button {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
+.hero-hit {
+  display: block;
   width: 100%;
   padding: 0;
   border: 0;
   background: transparent;
-  text-align: left;
-  color: var(--ink);
+  cursor: pointer;
+  line-height: 0;
 }
 
-.home-shortcut__button strong {
+.hero-hit picture,
+.hero-hit img {
   display: block;
-  font-size: 15px;
-  margin-bottom: 4px;
-}
-
-.home-shortcut__button small {
-  display: block;
-  color: var(--muted);
-  font-size: var(--text-caption);
-  line-height: 1.35;
-}
-
-.home-shortcut__hint {
-  margin: 10px 0 0 32px;
-  font-size: 12px;
-  color: var(--muted);
+  width: 100%;
+  height: auto;
 }
 
 
@@ -1774,11 +1722,6 @@ main {
 }
 
 @media (min-width: 600px) {
-  .hero {
-    min-height: 520px;
-    padding: 0 32px 28px;
-  }
-
   .content-section,
   .page {
     padding-right: 28px;
