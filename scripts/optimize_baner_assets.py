@@ -1,25 +1,61 @@
 #!/usr/bin/env python3
-"""Recompress baner + @2x/webp and home-screen icons from web/public sources."""
+"""Copy images/baner.jpg → web/public + baner.jpg (1x) and baner@2x.jpg."""
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
-from PIL import Image, ImageFilter
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "web" / "public"
-SRC = PUBLIC / "baner.jpg"
+MASTER = ROOT / "images" / "baner.jpg"
+PUBLIC_SRC = PUBLIC / "baner.jpg"
 
 
 def main() -> None:
-    if not SRC.is_file():
-        raise SystemExit(f"Not found: {SRC}")
-    im = Image.open(SRC).convert("RGB")
+    source = MASTER if MASTER.is_file() else PUBLIC_SRC
+    if not source.is_file():
+        raise SystemExit(f"Not found: {MASTER} or {PUBLIC_SRC}")
+
+    if source != PUBLIC_SRC:
+        shutil.copy2(source, PUBLIC_SRC)
+
+    im = Image.open(PUBLIC_SRC).convert("RGB")
     w, h = im.size
-    im2 = im.resize((w * 2, h * 2), Image.Resampling.LANCZOS)
-    im2 = im2.filter(ImageFilter.UnsharpMask(radius=1.2, percent=140, threshold=2))
-    im.save(SRC, quality=96, optimize=True, progressive=True, subsampling=0)
-    im2.save(PUBLIC / "baner@2x.jpg", quality=94, optimize=True, progressive=True, subsampling=0)
+
+    if w >= 1200:
+        im.save(
+            PUBLIC / "baner@2x.jpg",
+            quality=92,
+            optimize=True,
+            progressive=True,
+            subsampling=0,
+        )
+        one_x = im.resize((w // 2, h // 2), Image.Resampling.LANCZOS)
+        one_x.save(
+            PUBLIC / "baner.jpg",
+            quality=90,
+            optimize=True,
+            progressive=True,
+            subsampling=0,
+        )
+    else:
+        im.save(
+            PUBLIC / "baner.jpg",
+            quality=96,
+            optimize=True,
+            progressive=True,
+            subsampling=0,
+        )
+        im2 = im.resize((w * 2, h * 2), Image.Resampling.LANCZOS)
+        im2.save(
+            PUBLIC / "baner@2x.jpg",
+            quality=92,
+            optimize=True,
+            progressive=True,
+            subsampling=0,
+        )
 
     logo = Image.open(PUBLIC / "logo-header.png").convert("RGBA")
     alpha = logo.split()[-1]
@@ -35,7 +71,8 @@ def main() -> None:
         bg = Image.new("RGB", (size, size), "#0f2744")
         bg.paste(out, mask=out.split()[-1])
         bg.save(PUBLIC / name, optimize=True)
-    print(f"baner {w}x{h} + derivatives ok")
+
+    print(f"baner master {w}x{h} → public baner.jpg + baner@2x.jpg")
 
 
 if __name__ == "__main__":
