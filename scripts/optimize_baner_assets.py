@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "web" / "public"
@@ -17,10 +17,9 @@ def main() -> None:
     im = Image.open(SRC).convert("RGB")
     w, h = im.size
     im2 = im.resize((w * 2, h * 2), Image.Resampling.LANCZOS)
-    im.save(SRC, quality=94, optimize=True, progressive=True)
-    im2.save(PUBLIC / "baner@2x.jpg", quality=92, optimize=True, progressive=True)
-    im.save(PUBLIC / "baner.webp", quality=88, method=6)
-    im2.save(PUBLIC / "baner@2x.webp", quality=85, method=6)
+    im2 = im2.filter(ImageFilter.UnsharpMask(radius=1.2, percent=140, threshold=2))
+    im.save(SRC, quality=96, optimize=True, progressive=True, subsampling=0)
+    im2.save(PUBLIC / "baner@2x.jpg", quality=94, optimize=True, progressive=True, subsampling=0)
 
     logo = Image.open(PUBLIC / "logo-header.png").convert("RGBA")
     alpha = logo.split()[-1]

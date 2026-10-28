@@ -1,7 +1,6 @@
 export type HomeScreenStatus = 'unsupported' | 'unknown' | 'added' | 'missed'
 
 const DONE_KEY = 'ches_home_screen_done'
-const ASKED_KEY = 'ches_home_screen_asked'
 
 type WebAppHome = {
   addToHomeScreen?: () => void
@@ -51,15 +50,7 @@ export function checkHomeScreenStatus(): Promise<HomeScreenStatus> {
   })
 }
 
-/** Native Telegram «добавить на главный экран» — без своего блока с ⋮ в меню. */
+/** @deprecated use HomeScreenInstallBar — auto-prompt скрывал кнопку после первого раза */
 export function maybePromptHomeScreen(): void {
-  if (!homeScreenSupported()) return
-  if (localStorage.getItem(DONE_KEY) === '1') return
-
-  void checkHomeScreenStatus().then((status) => {
-    if (status === 'added' || status === 'unsupported' || status === 'unknown') return
-    if (localStorage.getItem(ASKED_KEY) === '1') return
-    localStorage.setItem(ASKED_KEY, '1')
-    window.setTimeout(() => requestAddToHomeScreen(), 900)
-  })
+  return
 }

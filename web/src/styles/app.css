@@ -1982,61 +1982,205 @@ main {
 }
 
 .admin-promos {
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
-.admin-promos h2 {
-  margin: 0 0 12px;
-  font-size: 16px;
+.admin-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
-.admin-promo-form {
+.admin-section__head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.admin-section__count {
+  display: grid;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  place-items: center;
+  border-radius: 999px;
+  background: #e8f0f8;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.admin-promo-form.form-card {
+  margin-bottom: 16px;
+}
+
+.admin-promo-form.form-card label {
+  display: block;
+  min-height: auto;
+  padding: 0;
+  border: 0;
+}
+
+.admin-promo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-promo-field {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-promo-field--wide {
+  grid-column: 1 / -1;
+}
+
+.admin-promo-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.admin-promo-field input,
+.admin-promo-field select {
+  width: 100%;
+  padding: 12px 14px;
+  color: var(--ink);
+  border: 1px solid #d8e3ee;
+  border-radius: 14px;
+  background: #f8fafc;
+  font-size: 15px;
+}
+
+.admin-promo-submit {
+  width: 100%;
+  justify-content: center;
+}
+
+.admin-promo-list {
   display: grid;
   gap: 10px;
-  margin-bottom: 14px;
 }
 
-.admin-promo-form label {
-  display: grid;
-  gap: 4px;
+.admin-promo-card {
+  padding: 14px 16px;
+  border: 1px solid #e3ebf3;
+  border-radius: 16px;
+  background: #fff;
 }
 
-.admin-promo-form__row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.admin-promo-card.is-off {
+  opacity: 0.62;
+}
+
+.admin-promo-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.admin-promo-card__code {
+  font-size: 18px;
+  letter-spacing: 0.06em;
+}
+
+.admin-promo-card__badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef2f6;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-promo-card__badge.is-on {
+  background: #e6f7ef;
+  color: #0c6245;
+}
+
+.admin-promo-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.admin-promo-card__note {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-promo-card__actions {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
-.admin-promo-line {
+.home-install {
+  margin: 0 16px 14px;
+}
+
+.home-install__button {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
   gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid #e8edf3;
+  width: 100%;
+  padding: 14px 16px;
+  text-align: left;
+  color: var(--ink);
+  border: 1px solid #c5daf0;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #edf5ff 0%, #f8fbff 100%);
+  cursor: pointer;
 }
 
-.admin-promo-line.is-off {
-  opacity: 0.55;
-}
-
-.admin-promo-line__main {
+.home-install__icon {
   display: grid;
-  gap: 2px;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  color: var(--blue);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(15, 39, 68, 0.08);
+}
+
+.home-install__copy {
+  display: grid;
+  gap: 4px;
   min-width: 0;
 }
 
-.admin-promo-line__main small {
-  color: var(--muted);
-  font-size: var(--text-caption);
+.home-install__copy strong {
+  font-size: 15px;
 }
 
-.admin-promo-line__actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  flex-shrink: 0;
+.home-install__copy small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+@media (min-width: 560px) {
+  .admin-promo-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .admin-promo-field--wide {
+    grid-column: span 2;
+  }
 }
 
 .text-button.danger {

@@ -47,7 +47,7 @@ import { CategoryIcon } from './components/CategoryIcon'
 import { ProductCard } from './components/ProductCard'
 import { ProductSheet } from './components/ProductSheet'
 import { ProductVisual } from './components/ProductVisual'
-import { maybePromptHomeScreen } from './homeScreen'
+import { HomeScreenInstallBar } from './components/HomeScreenInstallBar'
 import type {
   CartLine,
   Catalog,
@@ -359,28 +359,24 @@ function HomeView({
   onProduct: (product: Product) => void
   onCatalog: () => void
 }) {
-  useEffect(() => {
-    maybePromptHomeScreen()
-  }, [])
-
   return (
     <>
       <section className="hero">
         <button type="button" className="hero-hit" onClick={onCatalog} aria-label="Смотреть каталог">
-          <picture>
-            <source type="image/webp" srcSet="/baner.webp 1x, /baner@2x.webp 2x" />
-            <img
-              src="/baner.jpg"
-              srcSet="/baner.jpg 1x, /baner@2x.jpg 2x"
-              alt="Chesalin Hockey — каталог экипировки"
-              width={960}
-              height={1280}
-              decoding="async"
-              fetchPriority="high"
-            />
-          </picture>
+          <img
+            src="/baner@2x.jpg"
+            srcSet="/baner.jpg 960w, /baner@2x.jpg 1920w"
+            sizes="(max-width: 600px) calc(100vw - 24px), 560px"
+            alt="Chesalin Hockey — каталог экипировки"
+            width={1920}
+            height={2560}
+            decoding="async"
+            fetchPriority="high"
+          />
         </button>
       </section>
+
+      <HomeScreenInstallBar />
 
       <section className="content-section category-section">
         <div className="section-heading">
@@ -996,77 +992,90 @@ function AdminView({
       {message && <p className="admin-message">{message}</p>}
       {offline && <div className="form-error">Админка доступна только при подключённом backend.</div>}
 
-      <div className="admin-promos">
-        <h2>Промокоды</h2>
+      <div className="admin-section admin-promos">
+        <div className="admin-section__head">
+          <h2>Промокоды</h2>
+          <span className="admin-section__count">{promos.length}</span>
+        </div>
+
         <div className="admin-promo-form form-card">
-          <label>
-            <small>Код</small>
-            <input
-              value={promoForm.code}
-              onChange={(e) => setPromoForm({ ...promoForm, code: e.target.value.toUpperCase() })}
-              placeholder="CHES10"
-              disabled={offline || promoBusy}
-            />
-          </label>
-          <div className="admin-promo-form__row">
-            <label>
-              <small>Тип</small>
+          <h3><span>%</span> Новый промокод</h3>
+          <div className="admin-promo-grid">
+            <label className="admin-promo-field admin-promo-field--wide">
+              <span className="admin-promo-label">Код</span>
+              <input
+                value={promoForm.code}
+                onChange={(e) => setPromoForm({ ...promoForm, code: e.target.value.toUpperCase() })}
+                placeholder="CHES10"
+                disabled={offline || promoBusy}
+                autoCapitalize="characters"
+              />
+            </label>
+            <label className="admin-promo-field">
+              <span className="admin-promo-label">Тип скидки</span>
               <select
                 value={promoForm.kind}
                 onChange={(e) => setPromoForm({ ...promoForm, kind: e.target.value as 'percent' | 'fixed' })}
                 disabled={offline || promoBusy}
               >
-                <option value="percent">Процент</option>
-                <option value="fixed">Фикс. сумма ₽</option>
+                <option value="percent">Процент, %</option>
+                <option value="fixed">Сумма, ₽</option>
               </select>
             </label>
-            <label>
-              <small>Значение</small>
+            <label className="admin-promo-field">
+              <span className="admin-promo-label">Значение</span>
               <input
                 inputMode="numeric"
                 value={promoForm.value}
                 onChange={(e) => setPromoForm({ ...promoForm, value: e.target.value })}
+                placeholder="10"
                 disabled={offline || promoBusy}
               />
             </label>
-            <label>
-              <small>Лимит (пусто = ∞)</small>
+            <label className="admin-promo-field">
+              <span className="admin-promo-label">Лимит использований</span>
               <input
                 inputMode="numeric"
                 value={promoForm.maxUses}
                 onChange={(e) => setPromoForm({ ...promoForm, maxUses: e.target.value })}
-                placeholder="100"
+                placeholder="Без лимита"
+                disabled={offline || promoBusy}
+              />
+            </label>
+            <label className="admin-promo-field admin-promo-field--wide">
+              <span className="admin-promo-label">Заметка (необязательно)</span>
+              <input
+                value={promoForm.note}
+                onChange={(e) => setPromoForm({ ...promoForm, note: e.target.value })}
+                placeholder="Акция, канал, дата"
                 disabled={offline || promoBusy}
               />
             </label>
           </div>
-          <label>
-            <small>Заметка</small>
-            <input
-              value={promoForm.note}
-              onChange={(e) => setPromoForm({ ...promoForm, note: e.target.value })}
-              placeholder="Акция, канал, дата"
-              disabled={offline || promoBusy}
-            />
-          </label>
-          <button className="primary-button" type="button" disabled={offline || promoBusy} onClick={createPromo}>
-            Создать промокод
+          <button className="primary-button admin-promo-submit" type="button" disabled={offline || promoBusy} onClick={createPromo}>
+            <Tag size={18} /> Создать промокод
           </button>
         </div>
+
         <div className="admin-promo-list">
           {promos.map((promo) => (
-            <article className={`admin-promo-line ${promo.active ? '' : 'is-off'}`} key={promo.code}>
-              <div className="admin-promo-line__main">
-                <strong>{promo.code}</strong>
-                <span>{promoKindLabel(promo)}</span>
-                <small>
-                  {promo.usedCount}
-                  {promo.maxUses != null ? ` / ${promo.maxUses}` : ''} применений
-                  {promo.note ? ` · ${promo.note}` : ''}
-                </small>
+            <article className={`admin-promo-card ${promo.active ? '' : 'is-off'}`} key={promo.code}>
+              <div className="admin-promo-card__top">
+                <strong className="admin-promo-card__code">{promo.code}</strong>
+                <span className={`admin-promo-card__badge ${promo.active ? 'is-on' : ''}`}>
+                  {promo.active ? 'Активен' : 'Выключен'}
+                </span>
               </div>
-              <div className="admin-promo-line__actions">
-                <button type="button" className="text-button" disabled={promoBusy} onClick={() => togglePromo(promo)}>
+              <div className="admin-promo-card__meta">
+                <span>{promoKindLabel(promo)}</span>
+                <span>
+                  {promo.usedCount}
+                  {promo.maxUses != null ? ` / ${promo.maxUses}` : ''} использований
+                </span>
+              </div>
+              {promo.note ? <p className="admin-promo-card__note">{promo.note}</p> : null}
+              <div className="admin-promo-card__actions">
+                <button type="button" className="secondary-button" disabled={promoBusy} onClick={() => togglePromo(promo)}>
                   {promo.active ? 'Выключить' : 'Включить'}
                 </button>
                 <button type="button" className="text-button danger" disabled={promoBusy} onClick={() => removePromo(promo.code)}>
@@ -1075,7 +1084,7 @@ function AdminView({
               </div>
             </article>
           ))}
-          {!promos.length && !offline && <p className="admin-orders-empty">Промокодов пока нет</p>}
+          {!promos.length && !offline && <p className="admin-orders-empty">Промокодов пока нет — создайте первый выше</p>}
         </div>
       </div>
 
