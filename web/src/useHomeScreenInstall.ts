@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 
 import {
   checkHomeScreenStatus,
-  homeScreenSupported,
-  requestAddToHomeScreen,
+  installHomeScreenShortcut,
+  isHomeScreenMarkedAdded,
+  isTelegramMiniApp,
 } from './homeScreen'
 
 export type HomeScreenInstallState = 'loading' | 'hidden' | 'show'
@@ -15,34 +16,30 @@ export function useHomeScreenInstall(): {
   const [state, setState] = useState<HomeScreenInstallState>('loading')
 
   useEffect(() => {
-    if (!homeScreenSupported()) {
-      setState('hidden')
-      return
+    const sync = () => {
+      if (!isTelegramMiniApp()) {
+        setState('hidden')
+        return
+      }
+      if (isHomeScreenMarkedAdded()) {
+        setState('hidden')
+        return
+      }
+      void checkHomeScreenStatus().then((status) => {
+        setState(status === 'added' ? 'hidden' : 'show')
+      })
     }
 
-    let cancelled = false
-    const hide = () => {
-      if (!cancelled) setState('hidden')
-    }
-
+    sync()
     const app = window.Telegram?.WebApp as { onEvent?: (event: string, handler: () => void) => void } | undefined
-    app?.onEvent?.('homeScreenAdded', hide)
+    app?.onEvent?.('homeScreenAdded', () => setState('hidden'))
 
-    void checkHomeScreenStatus().then((status) => {
-      if (cancelled) return
-      setState(status === 'added' ? 'hidden' : 'show')
-    })
-
-    return () => {
-      cancelled = true
-    }
+    const retry = window.setTimeout(sync, 800)
+    return () => window.clearTimeout(retry)
   }, [])
 
   return {
     state,
-    install: () => {
-      requestAddToHomeScreen()
-      window.Telegram?.WebApp.HapticFeedback?.impactOccurred('light')
-    },
+    install: installHomeScreenShortcut,
   }
 }

@@ -2128,7 +2128,10 @@ main {
 }
 
 .home-install {
-  margin: 0 16px 14px;
+  margin: 0 12px 10px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
 .home-install__button {

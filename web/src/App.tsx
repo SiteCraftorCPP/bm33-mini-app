@@ -251,6 +251,8 @@ function App() {
         </button>
       </header>
 
+      <HomeScreenInstallBar />
+
       <main>
         {loading ? (
           <LoadingScreen />
@@ -375,8 +377,6 @@ function HomeView({
           />
         </button>
       </section>
-
-      <HomeScreenInstallBar />
 
       <section className="content-section category-section">
         <div className="section-heading">
