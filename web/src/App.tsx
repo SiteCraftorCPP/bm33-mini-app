@@ -372,14 +372,9 @@ function HomeView({
   return (
     <>
       <section className="hero">
-        <div className="hero-copy">
-          <span className="hero-kicker"><span /> ЭКИПИРОВКА, КОТОРАЯ РЕШАЕТ</span>
-          <h1>Твой лёд.<br /><em>Твои правила.</em></h1>
-          <p>Профессиональная хоккейная экипировка в наличии. Подберём вариант под вашу игру.</p>
-          <button className="hero-button" onClick={onCatalog}>
-            Смотреть каталог <ArrowRight size={18} />
-          </button>
-        </div>
+        <button type="button" className="hero-button" onClick={onCatalog}>
+          Смотреть каталог <ArrowRight size={18} />
+        </button>
       </section>
 
       {showShortcut && (
