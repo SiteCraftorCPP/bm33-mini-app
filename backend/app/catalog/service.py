@@ -92,6 +92,12 @@ def sync_catalog(db: Session, imported: list[ImportedProduct]) -> list[str]:
     return restocked
 
 
+def public_image_url(product_id: str, stored: str) -> str:
+    if not (stored or "").strip():
+        return ""
+    return f"/api/catalog/image/{product_id}"
+
+
 def catalog_payload(db: Session) -> dict:
     reserved = pending_quantities(db)
     products = db.scalars(
@@ -116,7 +122,7 @@ def catalog_payload(db: Session) -> dict:
                 "name": product.name,
                 "category": product.category,
                 "description": product.description,
-                "imageUrl": product.image_url,
+                "imageUrl": public_image_url(product.id, product.image_url),
                 "stock": available,
                 "minPrice": min(prices) if prices else 0,
                 "variants": [

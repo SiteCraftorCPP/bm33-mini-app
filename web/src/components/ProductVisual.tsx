@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import { CATEGORY_ICON_SRC, categoryIconSrc } from './categoryIcons'
 
 export function ProductVisual({
@@ -10,11 +12,13 @@ export function ProductVisual({
   compact?: boolean
 }) {
   const tone = Object.keys(CATEGORY_ICON_SRC).indexOf(category)
+  const [failed, setFailed] = useState(false)
+  const showPhoto = Boolean(imageUrl) && !failed
 
   return (
     <div className={`product-visual tone-${tone % 7} ${compact ? 'is-compact' : ''}`}>
-      {imageUrl ? (
-        <img src={imageUrl} alt="" />
+      {showPhoto ? (
+        <img src={imageUrl} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
       ) : (
         <img className="product-category-icon" src={categoryIconSrc(category)} alt="" />
       )}

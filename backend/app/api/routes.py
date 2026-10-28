@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -98,6 +99,33 @@ def public_config(request: Request) -> dict:
 @router.get("/catalog")
 def catalog(db: Session = Depends(get_db)) -> dict:
     return catalog_payload(db)
+
+
+_DRIVE_IMAGE_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; ChesHockey/1.0)"}
+
+
+@router.get("/catalog/image/{product_id}")
+def catalog_product_image(product_id: str, db: Session = Depends(get_db)) -> Response:
+    product = db.get(Product, product_id)
+    if product is None or not product.active:
+        raise HTTPException(status_code=404, detail="Product not found")
+    source = (product.image_url or "").strip()
+    if not source:
+        raise HTTPException(status_code=404, detail="No image")
+    try:
+        with httpx.Client(timeout=25.0, follow_redirects=True, headers=_DRIVE_IMAGE_HEADERS) as client:
+            upstream = client.get(source)
+            upstream.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Image fetch failed") from exc
+    content_type = upstream.headers.get("content-type", "image/jpeg")
+    if not content_type.casefold().startswith("image/"):
+        raise HTTPException(status_code=502, detail="Invalid image response")
+    return Response(
+        content=upstream.content,
+        media_type=content_type.split(";")[0].strip(),
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @router.post("/catalog/sync")
