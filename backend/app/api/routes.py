@@ -17,6 +17,7 @@ from app.catalog.importer import (
     extract_drive_file_id,
     stick_catalog_warnings,
 )
+from app.catalog.photo_check import catalog_photo_warnings
 from app.catalog.service import catalog_payload, sync_catalog
 from app.config import Settings, get_settings
 from app.db import get_db
@@ -216,7 +217,15 @@ async def force_sync(
     except SheetsError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     restocked = sync_catalog(db, imported)
-    return {"ok": True, "products": len(imported), "restocked": len(restocked)}
+    stick_warnings = stick_catalog_warnings(imported)
+    photo_warnings = catalog_photo_warnings(imported)
+    return {
+        "ok": True,
+        "products": len(imported),
+        "restocked": len(restocked),
+        "stickWarnings": stick_warnings,
+        "photoWarnings": photo_warnings,
+    }
 
 
 @router.post("/orders", status_code=status.HTTP_201_CREATED)
@@ -484,11 +493,13 @@ async def admin_catalog_sync(
         ) from exc
     restocked = sync_catalog(db, imported)
     stick_warnings = stick_catalog_warnings(imported)
+    photo_warnings = catalog_photo_warnings(imported)
     return {
         "ok": True,
         "products": len(imported),
         "restocked": len(restocked),
         "stickWarnings": stick_warnings,
+        "photoWarnings": photo_warnings,
     }
 
 

@@ -921,10 +921,13 @@ function AdminView({
       const result = await adminSyncCatalog()
       await onCatalogRefresh()
       const lines = [
-        result.stickWarnings.length
-          ? `Синхронизировано: ${formatModelCount(result.products)}, поступления: ${result.restocked}. Предупреждения по клюшкам: ${result.stickWarnings.length}`
-          : `Синхронизировано: ${formatModelCount(result.products)}, уведомлений о поступлении: ${result.restocked}`,
-        ...result.stickWarnings.slice(0, 8),
+        `Синхронизировано: ${formatModelCount(result.products)}, поступления: ${result.restocked}.`,
+        ...(result.photoWarnings.length
+          ? [`Фото не загрузятся (${result.photoWarnings.length}):`, ...result.photoWarnings.slice(0, 12)]
+          : ['Фото: все ссылки с сервера открываются.']),
+        ...(result.stickWarnings.length
+          ? [`Клюшки — проверьте названия (${result.stickWarnings.length}):`, ...result.stickWarnings.slice(0, 6)]
+          : []),
       ]
       setMessage(lines.join('\n'))
       refresh()
