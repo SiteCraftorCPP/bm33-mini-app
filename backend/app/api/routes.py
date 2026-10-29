@@ -140,7 +140,7 @@ def catalog_product_image(product_id: str, db: Session = Depends(get_db)) -> Res
     return Response(
         content=upstream.content,
         media_type=content_type.split(";")[0].strip(),
-        headers={"Cache-Control": "public, max-age=86400"},
+        headers={"Cache-Control": "public, max-age=600, must-revalidate"},
     )
 
 

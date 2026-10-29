@@ -506,16 +506,27 @@ main {
   object-position: center;
 }
 
-.product-card .product-visual {
+.product-card .product-visual:not(.has-photo) {
   aspect-ratio: 1 / 1.12;
   min-height: 0;
 }
 
 .product-card .product-visual.has-photo {
-  display: grid;
-  place-items: center;
-  padding: 4px;
-  box-sizing: border-box;
+  display: block;
+  aspect-ratio: auto;
+  height: auto;
+  padding: 0;
+  line-height: 0;
+  overflow: hidden;
+}
+
+.product-card .product-visual.has-photo img.product-photo {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: none;
+  display: block;
+  object-fit: contain;
 }
 
 .sheet-visual .product-visual.has-photo {

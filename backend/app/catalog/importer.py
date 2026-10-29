@@ -179,16 +179,15 @@ def normalize_image_url(raw: str) -> str:
 
     file_id = extract_drive_file_id(text)
     if file_id:
-        return f"https://drive.google.com/thumbnail?id={file_id}&sz=w1600"
+        return f"https://drive.google.com/uc?export=download&id={file_id}"
     return text
 
 
 def drive_image_fetch_urls(stored: str) -> list[str]:
-    """Try thumbnail first, then full file — avoids HTML previews from /uc."""
+    """Full file only — Drive thumbnail API returns center-cropped previews."""
     file_id = extract_drive_file_id(stored)
     if file_id:
         return [
-            f"https://drive.google.com/thumbnail?id={file_id}&sz=w1600",
             f"https://drive.google.com/uc?export=download&id={file_id}",
             f"https://drive.google.com/uc?export=view&id={file_id}",
         ]
