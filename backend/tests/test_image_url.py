@@ -13,3 +13,13 @@ Bauer Fuse L,70,92,2,7500,https://drive.google.com/file/d/photo1/view
     products = parse_sheet(csv_text, SHEETS[0])
     assert "id=photo1" in products[0].image_url
     assert "export=download" in products[0].image_url
+
+
+def test_continuation_row_adds_second_photo_url() -> None:
+    csv_text = """Название,Флекс,Загиб,Наличие,Цена,Фото
+Stick L,70,92,2,7500,https://drive.google.com/file/d/aaa/view
+,77,28,0,7500,https://drive.google.com/file/d/bbb/view
+"""
+    products = parse_sheet(csv_text, SHEETS[0])
+    assert "id=aaa" in products[0].image_url
+    assert "id=bbb" in products[0].image_url

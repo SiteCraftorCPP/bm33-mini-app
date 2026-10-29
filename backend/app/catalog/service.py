@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session, selectinload
 
@@ -7,6 +9,7 @@ from app.catalog.importer import (
     ImportedProduct,
     ImportedVariant,
     canonical_product_name,
+    merge_stored_image_urls,
     stable_product_id,
 )
 from app.models import Product, Variant
@@ -24,21 +27,32 @@ CATEGORY_ORDER = (
 )
 
 
+def _prefer_merged_stick_name(existing: str, incoming: str, category: str) -> str:
+    left = canonical_product_name(existing, category)
+    right = canonical_product_name(incoming, category)
+    if category == "Клюшки":
+        if re.search(r"\spro\s*$", right, flags=re.IGNORECASE) and not re.search(
+            r"\spro\s*$", left, flags=re.IGNORECASE
+        ):
+            return right
+    return right if len(right) > len(left) else left
+
+
 def _merged_products(
     imported: list[ImportedProduct],
 ) -> list[tuple[str, str, str, int, str, list[ImportedVariant]]]:
     grouped: dict[tuple[str, str], tuple[str, int, str, list[ImportedVariant]]] = {}
     for product in imported:
         name = canonical_product_name(product.name, product.category)
-        product_id = stable_product_id(product.category, name)
+        product_id = stable_product_id(product.category, product.name)
         key = (product.category, product_id)
         if key not in grouped:
             grouped[key] = (name, product.sort_order, product.image_url, [])
         else:
             prev_name, sort_order, image_url, variants = grouped[key]
-            if not image_url and product.image_url:
-                image_url = product.image_url
-            grouped[key] = (prev_name, sort_order, image_url, variants)
+            name = _prefer_merged_stick_name(prev_name, product.name, product.category)
+            image_url = merge_stored_image_urls(image_url, product.image_url)
+            grouped[key] = (name, sort_order, image_url, variants)
         grouped[key][3].extend(product.variants)
 
     merged = []

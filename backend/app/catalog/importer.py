@@ -7,6 +7,8 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
+import httpx
+
 
 @dataclass(frozen=True)
 class SheetDefinition:
@@ -98,6 +100,25 @@ def canonical_product_name(name: str, category: str) -> str:
     return re.sub(r"\s{2,}", " ", cleaned).strip()
 
 
+def stick_catalog_identity(name: str, category: str) -> str:
+    """One card for L+R even if «Pro» only on one вкладке."""
+    base = canonical_product_name(name, category)
+    if category == "Клюшки":
+        return re.sub(r"\s+pro\s*$", "", base, flags=re.IGNORECASE).strip()
+    return base
+
+
+def merge_stored_image_urls(*values: str) -> str:
+    """Keep all unique photo URLs (L/R sheets); proxy tries each."""
+    seen: list[str] = []
+    for raw in values:
+        for part in re.split(r"[|\n]+", raw or ""):
+            part = part.strip()
+            if part and part not in seen:
+                seen.append(part)
+    return "|".join(seen)
+
+
 def _product_side(name: str, default_side: str) -> str:
     if default_side:
         return default_side.upper()
@@ -125,7 +146,7 @@ def _semantic_id(prefix: str, *parts: str) -> str:
 
 
 def stable_product_id(category: str, name: str) -> str:
-    return _semantic_id("product", category, canonical_product_name(name, category))
+    return _semantic_id("product", category, stick_catalog_identity(name, category))
 
 
 def stable_variant_id(
@@ -141,7 +162,9 @@ def stable_variant_id(
     return _semantic_id(
         "variant",
         category,
-        canonical_product_name(product_name, category),
+        stick_catalog_identity(product_name, category)
+        if category == "Клюшки"
+        else canonical_product_name(product_name, category),
         option1_name,
         _canonical_option(option1_value, option1_name),
         option2_name,
@@ -183,15 +206,56 @@ def normalize_image_url(raw: str) -> str:
     return text
 
 
+def _is_yandex_disk_url(url: str) -> bool:
+    lowered = (url or "").casefold()
+    return "disk.yandex." in lowered or "yadi.sk/" in lowered
+
+
+def _yandex_download_href(client: httpx.Client, public_url: str) -> str | None:
+    try:
+        response = client.get(
+            "https://cloud-api.yandex.net/v1/disk/public/resources/download",
+            params={"public_key": public_url.strip()},
+            timeout=20.0,
+        )
+        response.raise_for_status()
+        href = response.json().get("href")
+    except (httpx.HTTPError, ValueError, AttributeError):
+        return None
+    return href if isinstance(href, str) and href.strip() else None
+
+
+_IMAGE_FETCH_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; ChesHockey/1.0)"}
+
+
+def catalog_image_fetch_urls(stored: str) -> list[str]:
+    """Resolve stored sheet URLs to fetchable image URLs (Drive, Yandex Disk, …)."""
+    urls: list[str] = []
+    with httpx.Client(timeout=25.0, follow_redirects=True, headers=_IMAGE_FETCH_HEADERS) as client:
+        for chunk in re.split(r"[|\n]+", (stored or "").strip()):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            if _is_yandex_disk_url(chunk):
+                href = _yandex_download_href(client, chunk)
+                if href and href not in urls:
+                    urls.append(href)
+                continue
+            file_id = extract_drive_file_id(chunk)
+            if file_id:
+                for candidate in (
+                    f"https://drive.google.com/uc?export=download&id={file_id}",
+                    f"https://drive.google.com/uc?export=view&id={file_id}",
+                ):
+                    if candidate not in urls:
+                        urls.append(candidate)
+            elif chunk not in urls:
+                urls.append(chunk)
+    return urls
+
+
 def drive_image_fetch_urls(stored: str) -> list[str]:
-    """Full file only — Drive thumbnail API returns center-cropped previews."""
-    file_id = extract_drive_file_id(stored)
-    if file_id:
-        return [
-            f"https://drive.google.com/uc?export=download&id={file_id}",
-            f"https://drive.google.com/uc?export=view&id={file_id}",
-        ]
-    return [stored.strip()] if stored.strip() else []
+    return catalog_image_fetch_urls(stored)
 
 
 def _number(value: str) -> int | None:
@@ -216,6 +280,14 @@ def _category(definition: SheetDefinition, name: str) -> str:
     return definition.category
 
 
+def _skate_sheet_model_name(definition: SheetDefinition, raw_name: str) -> str | None:
+    if definition.category != "Коньки":
+        return None
+    if re.match(r"^Размер\s", raw_name.strip(), flags=re.IGNORECASE):
+        return definition.title
+    return None
+
+
 def parse_sheet(csv_text: str, definition: SheetDefinition, sort_offset: int = 0) -> list[ImportedProduct]:
     rows = list(csv.reader(io.StringIO(csv_text.lstrip("\ufeff"))))
     products: list[ImportedProduct] = []
@@ -235,28 +307,48 @@ def parse_sheet(csv_text: str, definition: SheetDefinition, sort_offset: int = 0
             continue
 
         if raw_name:
-            previous_name = raw_name
             category = _category(definition, raw_name)
-            display_name = canonical_product_name(raw_name, category)
-            image_raw = ""
-            if definition.image_column is not None:
-                image_raw = _cell(row, definition.image_column)
-            current = ImportedProduct(
-                id=stable_product_id(category, raw_name),
-                name=display_name,
-                category=category,
-                sort_order=sort_offset + len(products),
-                image_url=normalize_image_url(image_raw),
-            )
-            products.append(current)
+            skate_model = _skate_sheet_model_name(definition, raw_name)
+            if skate_model:
+                previous_name = skate_model
+                display_name = canonical_product_name(skate_model, category)
+                product_id = stable_product_id(category, skate_model)
+                image_raw = _cell(row, definition.image_column) if definition.image_column is not None else ""
+                if current is None or current.id != product_id:
+                    current = ImportedProduct(
+                        id=product_id,
+                        name=display_name,
+                        category=category,
+                        sort_order=sort_offset + len(products),
+                        image_url=normalize_image_url(image_raw),
+                    )
+                    products.append(current)
+                elif image_raw:
+                    current.image_url = merge_stored_image_urls(
+                        current.image_url,
+                        normalize_image_url(image_raw),
+                    )
+            else:
+                previous_name = raw_name
+                display_name = canonical_product_name(raw_name, category)
+                image_raw = ""
+                if definition.image_column is not None:
+                    image_raw = _cell(row, definition.image_column)
+                current = ImportedProduct(
+                    id=stable_product_id(category, raw_name),
+                    name=display_name,
+                    category=category,
+                    sort_order=sort_offset + len(products),
+                    image_url=normalize_image_url(image_raw),
+                )
+                products.append(current)
         elif (
             current is not None
             and definition.image_column is not None
-            and not current.image_url
         ):
             extra = normalize_image_url(_cell(row, definition.image_column))
             if extra:
-                current.image_url = extra
+                current.image_url = merge_stored_image_urls(current.image_url, extra)
         elif not previous_name or current is None:
             continue
 
@@ -309,12 +401,12 @@ def stick_catalog_warnings(imported: list[ImportedProduct]) -> list[str]:
         if product.category != "Клюшки":
             continue
         canon = canonical_product_name(product.name, "Клюшки")
-        raw_names.setdefault(canon, set()).add(product.name.strip())
-        fuzzy = re.sub(r"\s+pro\s*$", "", canon, flags=re.IGNORECASE).strip()
-        ids_by_fuzzy.setdefault(fuzzy, set()).add(product.id)
+        merge_key = stick_catalog_identity(product.name, "Клюшки")
+        raw_names.setdefault(merge_key, set()).add(canon)
+        ids_by_fuzzy.setdefault(merge_key, set()).add(product.id)
         for variant in product.variants:
             if variant.side:
-                sides.setdefault(canon, set()).add(variant.side.upper())
+                sides.setdefault(merge_key, set()).add(variant.side.upper())
 
     warnings: list[str] = []
     for fuzzy, ids in sorted(ids_by_fuzzy.items()):
@@ -323,17 +415,17 @@ def stick_catalog_warnings(imported: list[ImportedProduct]) -> list[str]:
                 f"«{fuzzy}»: в каталоге {len(ids)} разных карточки — "
                 "на левой и правой вкладке должно быть одно имя (например, оба с «Pro»)"
             )
-    for canon, names in sorted(raw_names.items()):
+    for merge_key, names in sorted(raw_names.items()):
         if len(names) > 1:
             warnings.append(
-                f"«{canon}»: разные подписи ({', '.join(sorted(names))}) — "
-                "выровняйте название на обеих вкладках"
+                f"«{merge_key}»: разные подписи ({', '.join(sorted(names))}) — "
+                "выровняйте название на обеих вкладках (желательно оба с «Pro»)"
             )
-        hand = sides.get(canon, set())
+        hand = sides.get(merge_key, set())
         if hand == {"L"}:
-            warnings.append(f"«{canon}»: только левый хват — нет строк на «Клюшки правые»?")
+            warnings.append(f"«{merge_key}»: только левый хват — нет строк на «Клюшки правые»?")
         elif hand == {"R"}:
-            warnings.append(f"«{canon}»: только правый хват — нет строк на «Клюшки левые»?")
+            warnings.append(f"«{merge_key}»: только правый хват — нет строк на «Клюшки левые»?")
     return warnings
 
 

@@ -143,7 +143,7 @@ def test_trigger_unleashed_pro_merges_left_and_right() -> None:
     assert len(stick_catalog_warnings(left + right)) == 0
 
 
-def test_mismatched_pro_creates_duplicate_stick_products() -> None:
+def test_mismatched_pro_still_merges_one_stick_product() -> None:
     left = parse_sheet(
         "Название,Флекс,Загиб,Наличие,Цена\n"
         "CCM Trigger Unleashed L,30,28,1,7500\n",
@@ -154,6 +154,20 @@ def test_mismatched_pro_creates_duplicate_stick_products() -> None:
         "CCM Trigger Unleashed Pro R,30,28,2,7500\n",
         SHEETS[1],
     )
-    assert left[0].id != right[0].id
+    assert left[0].id == right[0].id
     warnings = stick_catalog_warnings(left + right)
-    assert any("Trigger Unleashed" in item and "2" in item for item in warnings)
+    assert any("разные подписи" in item for item in warnings)
+
+
+def test_variant_id_stable_when_pro_added_to_left_name() -> None:
+    without_pro = parse_sheet(
+        "Название,Флекс,Загиб,Наличие,Цена\n"
+        "CCM Trigger Unleashed L,30,28,1,7500\n",
+        SHEETS[0],
+    )
+    with_pro = parse_sheet(
+        "Название,Флекс,Загиб,Наличие,Цена\n"
+        "CCM Trigger Unleashed Pro L,30,28,1,7500\n",
+        SHEETS[0],
+    )
+    assert without_pro[0].variants[0].id == with_pro[0].variants[0].id
