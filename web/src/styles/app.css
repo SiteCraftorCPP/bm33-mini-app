@@ -786,6 +786,18 @@ main {
 .catalog-categories {
   margin: 0 -18px 22px;
   padding: 0 18px 5px;
+  padding-inline-end: 28px;
+  scroll-padding-inline: 18px 28px;
+}
+
+.horizontal-drag-scroll {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.horizontal-drag-scroll:active {
+  cursor: grabbing;
 }
 
 .catalog-categories button {
@@ -1825,6 +1837,14 @@ main {
 
   .category-rail::after {
     flex: 0 0 16px;
+  }
+
+  .catalog-categories {
+    margin-right: -28px;
+    margin-left: -28px;
+    padding-right: 36px;
+    padding-left: 28px;
+    scroll-padding-inline: 28px 36px;
   }
 
   .product-grid {

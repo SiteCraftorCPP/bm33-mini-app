@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { useHorizontalDragScroll } from './useHorizontalDragScroll'
 import {
   ArrowLeft,
   ArrowRight,
@@ -367,6 +368,8 @@ function HomeView({
   onProduct: (product: Product) => void
   onCatalog: () => void
 }) {
+  const homeCategoryScroll = useHorizontalDragScroll<HTMLDivElement>()
+  const { className: homeDragClass, ...homeDragRest } = homeCategoryScroll.dragScrollProps
   return (
     <>
       <section className="hero">
@@ -389,7 +392,11 @@ function HomeView({
           <div><h2>Категории</h2></div>
           <button onClick={onCatalog}>Все <ChevronRight size={16} /></button>
         </div>
-        <div className="category-rail">
+        <div
+          ref={homeCategoryScroll.ref}
+          className={`category-rail ${homeDragClass}`}
+          {...homeDragRest}
+        >
           {catalog.categories.map((category, index) => {
             return (
               <button className={`category-tile tile-${index}`} key={category.id} onClick={() => onCategory(category.name)}>
@@ -453,6 +460,8 @@ function CatalogView({
 }) {
   const filterCount = Object.values(categoryFilters).filter(Boolean).length
   const filtersAvailable = activeCategory !== 'Все' && filterGroups.length > 0
+  const catalogCategoryScroll = useHorizontalDragScroll<HTMLDivElement>()
+  const { className: catalogDragClass, ...catalogDragRest } = catalogCategoryScroll.dragScrollProps
   return (
     <section className="catalog-page page">
       <div className="page-title">
@@ -475,7 +484,11 @@ function CatalogView({
         )}
       </div>
 
-      <div className="catalog-categories">
+      <div
+        ref={catalogCategoryScroll.ref}
+        className={`catalog-categories ${catalogDragClass}`}
+        {...catalogDragRest}
+      >
         {['Все', ...catalog.categories.map((category) => category.name)].map((category) => (
           <button
             className={activeCategory === category ? 'is-active' : ''}
