@@ -501,18 +501,18 @@ main {
   box-sizing: border-box;
 }
 
-.product-card .product-visual.has-photo {
-  display: block;
-  aspect-ratio: auto;
-  height: auto;
+.product-card .product-visual {
+  aspect-ratio: 1 / 1.12;
+  min-height: 0;
 }
 
 .product-card .product-visual.has-photo > img:not(.product-category-icon) {
-  display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
   max-height: none;
-  padding: 8px;
+  padding: 10px;
+  object-fit: contain;
+  object-position: center;
 }
 
 .sheet-visual .product-visual.has-photo {
