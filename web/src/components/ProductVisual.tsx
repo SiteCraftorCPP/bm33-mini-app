@@ -20,7 +20,14 @@ export function ProductVisual({
       className={`product-visual tone-${tone % 7} ${compact ? 'is-compact' : ''} ${showPhoto ? 'has-photo' : ''}`}
     >
       {showPhoto ? (
-        <img src={imageUrl} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+        <img
+          className="product-photo"
+          src={imageUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+        />
       ) : (
         <img className="product-category-icon" src={categoryIconSrc(category)} alt="" />
       )}
