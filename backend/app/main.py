@@ -35,6 +35,20 @@ def _ensure_sqlite_columns(db_engine) -> None:
             conn.execute(text("ALTER TABLE orders ADD COLUMN discount INTEGER DEFAULT 0"))
 
 
+async def _warm_image_caches(settings) -> None:
+    from app.catalog.image_cache import warm_catalog_image_caches_async
+
+    try:
+        stats = await warm_catalog_image_caches_async(settings)
+        log.info(
+            "Image cache: updated=%s missing=%s",
+            stats.get("imageCacheUpdated"),
+            stats.get("imageCacheMissing"),
+        )
+    except Exception:
+        log.exception("Image cache warm failed")
+
+
 async def refresh_catalog(app: FastAPI) -> None:
     try:
         products = await app.state.sheets.fetch_catalog()
@@ -47,9 +61,7 @@ async def refresh_catalog(app: FastAPI) -> None:
 
     with SessionLocal() as db:
         restocked = sync_catalog(db, products)
-        from app.catalog.image_cache import warm_catalog_image_caches
-
-        warm_catalog_image_caches(db, app.state.settings)
+    asyncio.create_task(_warm_image_caches(app.state.settings))
     if restocked:
         await app.state.telegram.notify_restock(restocked)
     log.info("Catalog synchronized: %s products", len(products))

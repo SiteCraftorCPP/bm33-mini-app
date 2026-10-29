@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from pathlib import Path
 
 import httpx
 
 from app.catalog.importer import catalog_image_fetch_urls, extract_drive_file_id
+from app.db import SessionLocal
 from sqlalchemy import select
 
 from app.config import Settings
@@ -148,3 +150,15 @@ def warm_catalog_image_caches(db, settings: Settings) -> dict:
     pairs = [(product.id, product.image_url) for product in rows if (product.image_url or "").strip()]
     updated, missing = refresh_all_product_caches(settings, pairs)
     return {"imageCacheUpdated": updated, "imageCacheMissing": missing}
+
+
+async def warm_catalog_image_caches_async(settings: Settings) -> dict:
+    def work() -> dict:
+        with SessionLocal() as db:
+            return warm_catalog_image_caches(db, settings)
+
+    return await asyncio.to_thread(work)
+
+
+def schedule_warm_catalog_images(settings: Settings) -> None:
+    asyncio.create_task(warm_catalog_image_caches_async(settings))

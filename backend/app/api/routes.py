@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections import Counter
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -9,11 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.auth import TelegramIdentity, current_user, require_admin
-from app.catalog.image_cache import (
-    read_cached,
-    refresh_product_image_cache,
-    warm_catalog_image_caches,
-)
+from app.catalog.image_cache import read_cached, refresh_product_image_cache, schedule_warm_catalog_images
 from app.catalog.importer import CatalogDataError, stick_catalog_warnings
 from app.catalog.service import catalog_payload, sync_catalog
 from app.config import Settings, get_settings
@@ -153,13 +150,13 @@ async def force_sync(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     restocked = sync_catalog(db, imported)
     stick_warnings = stick_catalog_warnings(imported)
-    cache = warm_catalog_image_caches(db, settings)
+    schedule_warm_catalog_images(settings)
     return {
         "ok": True,
         "products": len(imported),
         "restocked": len(restocked),
         "stickWarnings": stick_warnings,
-        **cache,
+        "imageCachePending": True,
     }
 
 
@@ -428,13 +425,13 @@ async def admin_catalog_sync(
         ) from exc
     restocked = sync_catalog(db, imported)
     stick_warnings = stick_catalog_warnings(imported)
-    cache = warm_catalog_image_caches(db, request.app.state.settings)
+    schedule_warm_catalog_images(request.app.state.settings)
     return {
         "ok": True,
         "products": len(imported),
         "restocked": len(restocked),
         "stickWarnings": stick_warnings,
-        **cache,
+        "imageCachePending": True,
     }
 
 

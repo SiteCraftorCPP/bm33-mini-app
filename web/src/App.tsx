@@ -935,11 +935,8 @@ function AdminView({
       await onCatalogRefresh()
       const lines = [
         `Синхронизировано: ${formatModelCount(result.products)}, поступления: ${result.restocked}.`,
-        `Фото на сервере: ${result.imageCacheUpdated} моделей.`,
-        ...(result.imageCacheMissing
-          ? [
-              `Не удалось скачать ${result.imageCacheMissing} фото — положите файлы в общую папку Drive с доступом для бота (см. docs/photo-and-branding.md) или дайте публичный Яндекс.Диск.`,
-            ]
+        ...(result.imageCachePending
+          ? ['Фото докачиваются на сервер в фоне (1–2 мин), карточки обновятся сами.']
           : []),
         ...(result.stickWarnings.length
           ? [`Клюшки — названия (${result.stickWarnings.length}):`, ...result.stickWarnings.slice(0, 4)]
