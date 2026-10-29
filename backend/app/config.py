@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     google_sheet_id: str = "1Jvgo--zRkIQsdl5X1JWGeGsRQybH1r2XO84955qrtPY"
     google_service_account_file: str = ""
+    catalog_image_dir: str = ""
     sheets_sync_interval_seconds: int = 60
 
     model_config = SettingsConfigDict(

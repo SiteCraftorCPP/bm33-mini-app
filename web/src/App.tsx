@@ -922,11 +922,14 @@ function AdminView({
       await onCatalogRefresh()
       const lines = [
         `Синхронизировано: ${formatModelCount(result.products)}, поступления: ${result.restocked}.`,
-        ...(result.photoWarnings.length
-          ? [`Фото не загрузятся (${result.photoWarnings.length}):`, ...result.photoWarnings.slice(0, 12)]
-          : ['Фото: все ссылки с сервера открываются.']),
+        `Фото на сервере: ${result.imageCacheUpdated} моделей.`,
+        ...(result.imageCacheMissing
+          ? [
+              `Не удалось скачать ${result.imageCacheMissing} фото — положите файлы в общую папку Drive с доступом для бота (см. docs/photo-and-branding.md) или дайте публичный Яндекс.Диск.`,
+            ]
+          : []),
         ...(result.stickWarnings.length
-          ? [`Клюшки — проверьте названия (${result.stickWarnings.length}):`, ...result.stickWarnings.slice(0, 6)]
+          ? [`Клюшки — названия (${result.stickWarnings.length}):`, ...result.stickWarnings.slice(0, 4)]
           : []),
       ]
       setMessage(lines.join('\n'))

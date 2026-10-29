@@ -47,6 +47,9 @@ async def refresh_catalog(app: FastAPI) -> None:
 
     with SessionLocal() as db:
         restocked = sync_catalog(db, products)
+        from app.catalog.image_cache import warm_catalog_image_caches
+
+        warm_catalog_image_caches(db, app.state.settings)
     if restocked:
         await app.state.telegram.notify_restock(restocked)
     log.info("Catalog synchronized: %s products", len(products))

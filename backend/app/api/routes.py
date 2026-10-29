@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import re
 from collections import Counter
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -11,13 +9,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.auth import TelegramIdentity, current_user, require_admin
-from app.catalog.importer import (
-    CatalogDataError,
-    catalog_image_fetch_urls,
-    extract_drive_file_id,
-    stick_catalog_warnings,
+from app.catalog.image_cache import (
+    read_cached,
+    refresh_product_image_cache,
+    warm_catalog_image_caches,
 )
-from app.catalog.photo_check import catalog_photo_warnings
+from app.catalog.importer import CatalogDataError, stick_catalog_warnings
 from app.catalog.service import catalog_payload, sync_catalog
 from app.config import Settings, get_settings
 from app.db import get_db
@@ -109,46 +106,6 @@ def catalog(db: Session = Depends(get_db)) -> dict:
     return catalog_payload(db)
 
 
-_DRIVE_IMAGE_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; ChesHockey/1.0)"}
-
-
-def _drive_service_account_image(
-    stored: str,
-    settings: Settings,
-    client: httpx.Client,
-) -> httpx.Response | None:
-    path = (settings.google_service_account_file or "").strip()
-    if not path:
-        return None
-    for chunk in re.split(r"[|\n]+", stored):
-        file_id = extract_drive_file_id(chunk.strip())
-        if not file_id:
-            continue
-        try:
-            from google.oauth2 import service_account
-            import google.auth.transport.requests
-
-            creds = service_account.Credentials.from_service_account_file(
-                path,
-                scopes=["https://www.googleapis.com/auth/drive.readonly"],
-            )
-            creds.refresh(google.auth.transport.requests.Request())
-            response = client.get(
-                f"https://www.googleapis.com/drive/v3/files/{file_id}",
-                params={"alt": "media", "supportsAllDrives": "true"},
-                headers={"Authorization": f"Bearer {creds.token}"},
-                timeout=60.0,
-            )
-            if response.status_code != 200:
-                continue
-            if len(response.content) < 512:
-                continue
-            return response
-        except Exception:
-            continue
-    return None
-
-
 @router.get("/catalog/image/{product_id}")
 def catalog_product_image(
     product_id: str,
@@ -158,49 +115,27 @@ def catalog_product_image(
     product = db.get(Product, product_id)
     if product is None or not product.active:
         raise HTTPException(status_code=404, detail="Product not found")
+    cached = read_cached(settings, product_id)
+    if cached is not None:
+        body, mime = cached
+        return Response(
+            content=body,
+            media_type=mime,
+            headers={"Cache-Control": "public, max-age=600, must-revalidate"},
+        )
     source = (product.image_url or "").strip()
     if not source:
         raise HTTPException(status_code=404, detail="No image")
-    upstream = None
-    last_error: Exception | None = None
-    try:
-        with httpx.Client(timeout=25.0, follow_redirects=True, headers=_DRIVE_IMAGE_HEADERS) as client:
-            for candidate in catalog_image_fetch_urls(source):
-                try:
-                    response = client.get(candidate)
-                    response.raise_for_status()
-                except httpx.HTTPError as exc:
-                    last_error = exc
-                    continue
-                content_type = response.headers.get("content-type", "")
-                body = response.content
-                if not content_type.casefold().startswith("image/"):
-                    if body[:3] == b"\xff\xd8\xff":
-                        content_type = "image/jpeg"
-                    elif body[:8] == b"\x89PNG\r\n\x1a\n":
-                        content_type = "image/png"
-                    elif body[:4] == b"RIFF" and body[8:12] == b"WEBP":
-                        content_type = "image/webp"
-                    else:
-                        last_error = httpx.HTTPError(f"Not an image: {content_type}")
-                        continue
-                if len(body) < 512:
-                    last_error = httpx.HTTPError("Image too small")
-                    continue
-                upstream = response
-                break
-            if upstream is None:
-                upstream = _drive_service_account_image(source, settings, client)
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail="Image fetch failed") from exc
-    if upstream is None:
-        raise HTTPException(status_code=502, detail="Image fetch failed") from last_error
-    content_type = upstream.headers.get("content-type", "image/jpeg")
-    return Response(
-        content=upstream.content,
-        media_type=content_type.split(";")[0].strip(),
-        headers={"Cache-Control": "public, max-age=600, must-revalidate"},
-    )
+    if refresh_product_image_cache(settings, product_id, source):
+        cached = read_cached(settings, product_id)
+        if cached is not None:
+            body, mime = cached
+            return Response(
+                content=body,
+                media_type=mime,
+                headers={"Cache-Control": "public, max-age=600, must-revalidate"},
+            )
+    raise HTTPException(status_code=502, detail="Image fetch failed")
 
 
 @router.post("/catalog/sync")
@@ -218,13 +153,13 @@ async def force_sync(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     restocked = sync_catalog(db, imported)
     stick_warnings = stick_catalog_warnings(imported)
-    photo_warnings = catalog_photo_warnings(imported)
+    cache = warm_catalog_image_caches(db, settings)
     return {
         "ok": True,
         "products": len(imported),
         "restocked": len(restocked),
         "stickWarnings": stick_warnings,
-        "photoWarnings": photo_warnings,
+        **cache,
     }
 
 
@@ -493,13 +428,13 @@ async def admin_catalog_sync(
         ) from exc
     restocked = sync_catalog(db, imported)
     stick_warnings = stick_catalog_warnings(imported)
-    photo_warnings = catalog_photo_warnings(imported)
+    cache = warm_catalog_image_caches(db, request.app.state.settings)
     return {
         "ok": True,
         "products": len(imported),
         "restocked": len(restocked),
         "stickWarnings": stick_warnings,
-        "photoWarnings": photo_warnings,
+        **cache,
     }
 
 

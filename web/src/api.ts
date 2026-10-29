@@ -88,20 +88,23 @@ export async function adminSyncCatalog(): Promise<{
   products: number
   restocked: number
   stickWarnings: string[]
-  photoWarnings: string[]
+  imageCacheUpdated: number
+  imageCacheMissing: number
 }> {
   const payload = await request<{
     ok: boolean
     products: number
     restocked: number
     stickWarnings?: string[]
-    photoWarnings?: string[]
+    imageCacheUpdated?: number
+    imageCacheMissing?: number
   }>('/api/admin/catalog/sync', { method: 'POST' })
   return {
     products: payload.products,
     restocked: payload.restocked,
     stickWarnings: payload.stickWarnings ?? [],
-    photoWarnings: payload.photoWarnings ?? [],
+    imageCacheUpdated: payload.imageCacheUpdated ?? 0,
+    imageCacheMissing: payload.imageCacheMissing ?? 0,
   }
 }
 
