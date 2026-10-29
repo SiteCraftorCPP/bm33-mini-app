@@ -461,6 +461,20 @@ main {
   box-sizing: border-box;
 }
 
+.product-card .product-visual.has-photo {
+  display: block;
+  aspect-ratio: auto;
+  height: auto;
+}
+
+.product-card .product-visual.has-photo > img:not(.product-category-icon) {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  padding: 8px;
+}
+
 .sheet-visual .product-visual.has-photo {
   height: 290px;
 }

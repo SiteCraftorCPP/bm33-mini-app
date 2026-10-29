@@ -154,10 +154,15 @@ function App() {
 
   const visibleProducts = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('ru')
-    return catalog.products.filter((product) => {
+    const filtered = catalog.products.filter((product) => {
       if (activeCategory !== 'Все' && product.category !== activeCategory) return false
       if (normalizedQuery && !product.name.toLocaleLowerCase('ru').includes(normalizedQuery)) return false
       return productMatchesFilters(product, categoryFilters)
+    })
+    return [...filtered].sort((a, b) => {
+      const aOrder = a.stock > 0 ? 0 : 1
+      const bOrder = b.stock > 0 ? 0 : 1
+      return aOrder - bOrder
     })
   }, [activeCategory, catalog, query, categoryFilters])
 
