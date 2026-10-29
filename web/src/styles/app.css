@@ -519,35 +519,46 @@ main {
   border-radius: 14px;
 }
 
-.stock-pill {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 2;
-  max-width: calc(100% - 16px);
-  padding: 7px 11px;
-  color: #064d36;
-  border: 1px solid rgba(27, 131, 93, 0.22);
-  border-radius: 99px;
-  background: rgba(231, 249, 241, 0.96);
-  backdrop-filter: blur(6px);
-  font-size: var(--text-caption);
-  font-weight: 900;
-  line-height: 1.15;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  box-shadow: 0 4px 14px rgba(12, 98, 69, 0.12);
-}
-
-.stock-pill.is-empty {
-  color: #6b3d4d;
-  border-color: rgba(122, 82, 96, 0.22);
-  background: rgba(247, 235, 239, 0.96);
-  box-shadow: 0 4px 14px rgba(107, 61, 77, 0.1);
-}
-
 .product-card-body {
-  padding: 13px 13px 14px;
+  padding: 14px 14px 16px;
+}
+
+.product-card-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.product-card-meta .eyebrow {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.stock-badge {
+  flex-shrink: 0;
+  max-width: 52%;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  text-align: right;
+}
+
+.stock-badge.is-in-stock {
+  color: #0a5c41;
+  background: #e8f7f0;
+  border: 1px solid #b8e6d4;
+}
+
+.stock-badge.is-order {
+  color: #7a4a58;
+  background: #f9eef2;
+  border: 1px solid #ecd5de;
 }
 
 .eyebrow {
@@ -562,7 +573,7 @@ main {
 .product-card-body > strong {
   display: -webkit-box;
   min-height: 38px;
-  margin-top: 7px;
+  margin-top: 0;
   overflow: hidden;
   font-size: var(--text-ui);
   font-weight: 800;
