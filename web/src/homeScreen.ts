@@ -4,7 +4,7 @@ const DONE_KEY = 'ches_home_screen_done'
 
 type WebAppHome = {
   addToHomeScreen?: () => void
-  checkHomeScreenStatus?: () => void
+  checkHomeScreenStatus?: (callback?: (status: string) => void) => void
   onEvent?: (event: string, handler: (payload: { status?: string }) => void) => void
   initData?: string
   platform?: string
@@ -37,7 +37,7 @@ export function bindHomeScreenEvents(): void {
   const app = webApp()
   if (!app?.onEvent) return
   app.onEvent('homeScreenAdded', () => {
-    localStorage.setItem(DONE_KEY, '1')
+    syncHomeScreenDoneFlag('added')
   })
 }
 
@@ -45,25 +45,62 @@ export function isHomeScreenMarkedAdded(): boolean {
   return localStorage.getItem(DONE_KEY) === '1'
 }
 
+function normalizeHomeScreenStatus(raw: string | undefined): HomeScreenStatus {
+  if (raw === 'added' || raw === 'missed' || raw === 'unsupported' || raw === 'unknown') {
+    return raw
+  }
+  return 'unknown'
+}
+
+function syncHomeScreenDoneFlag(status: HomeScreenStatus): void {
+  if (status === 'added') {
+    localStorage.setItem(DONE_KEY, '1')
+    return
+  }
+  if (status === 'missed') {
+    localStorage.removeItem(DONE_KEY)
+  }
+}
+
+export function shouldShowHomeScreenInstall(status: HomeScreenStatus): boolean {
+  return status === 'missed' || status === 'unknown'
+}
+
 export function checkHomeScreenStatus(): Promise<HomeScreenStatus> {
   const app = webApp()
-  if (!app?.checkHomeScreenStatus || !app.onEvent) {
-    return Promise.resolve('missed')
+  if (!app?.checkHomeScreenStatus) {
+    return Promise.resolve(homeScreenSupported() ? 'unknown' : 'unsupported')
   }
 
   return new Promise((resolve) => {
-    const timeout = window.setTimeout(() => resolve('missed'), 2500)
-    app.onEvent!('homeScreenChecked', (payload) => {
+    let settled = false
+    const finish = (raw: string | undefined) => {
+      if (settled) return
+      settled = true
       window.clearTimeout(timeout)
-      const status = payload.status
-      if (status === 'added' || status === 'missed' || status === 'unsupported') {
-        if (status === 'added') localStorage.setItem(DONE_KEY, '1')
-        resolve(status === 'unsupported' ? 'missed' : status)
+      const status = normalizeHomeScreenStatus(raw)
+      syncHomeScreenDoneFlag(status)
+      resolve(status)
+    }
+
+    const timeout = window.setTimeout(() => finish('unknown'), 2500)
+
+    if (app.onEvent) {
+      app.onEvent('homeScreenChecked', (payload) => {
+        finish(payload.status)
+      })
+    }
+
+    const checker = app.checkHomeScreenStatus!
+    try {
+      if (checker.length >= 1) {
+        checker((status: string) => finish(status))
       } else {
-        resolve('missed')
+        checker()
       }
-    })
-    app.checkHomeScreenStatus!()
+    } catch {
+      finish('unknown')
+    }
   })
 }
 
