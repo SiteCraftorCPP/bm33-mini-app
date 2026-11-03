@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import re
 from pathlib import Path
 
 import httpx
+from PIL import Image, ImageOps
 
 from app.catalog.importer import catalog_image_fetch_urls, extract_drive_file_id
 from app.db import SessionLocal
@@ -49,7 +51,44 @@ def read_cached(settings: Settings, product_id: str) -> tuple[bytes, str] | None
     return data_path.read_bytes(), mime
 
 
+_CATALOG_CANVAS = (1200, 900)
+_CATALOG_BG = (243, 246, 249)
+
+
+def normalize_product_image(body: bytes, content_type: str) -> tuple[bytes, str]:
+    """Fit photo into a uniform 4:3 canvas (letterbox), fix EXIF orientation."""
+    if len(body) < 512:
+        return body, content_type
+    try:
+        img = Image.open(io.BytesIO(body))
+        img = ImageOps.exif_transpose(img)
+        if img.mode == "RGBA":
+            flat = Image.new("RGB", img.size, _CATALOG_BG)
+            flat.paste(img, mask=img.split()[3])
+            img = flat
+        elif img.mode != "RGB":
+            img = img.convert("RGB")
+
+        target_w, target_h = _CATALOG_CANVAS
+        src_w, src_h = img.size
+        if src_w < 1 or src_h < 1:
+            return body, content_type
+        scale = min(target_w / src_w, target_h / src_h)
+        new_w = max(1, round(src_w * scale))
+        new_h = max(1, round(src_h * scale))
+        resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        canvas = Image.new("RGB", _CATALOG_CANVAS, _CATALOG_BG)
+        canvas.paste(resized, ((target_w - new_w) // 2, (target_h - new_h) // 2))
+
+        out = io.BytesIO()
+        canvas.save(out, format="JPEG", quality=88, optimize=True)
+        return out.getvalue(), "image/jpeg"
+    except Exception:
+        return body, content_type
+
+
 def write_cached(settings: Settings, product_id: str, body: bytes, content_type: str) -> None:
+    body, content_type = normalize_product_image(body, content_type)
     data_path, meta_path = cache_paths(settings, product_id)
     data_path.write_bytes(body)
     meta_path.write_text(content_type.split(";")[0].strip() or "image/jpeg", encoding="utf-8")
