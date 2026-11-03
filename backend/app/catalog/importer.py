@@ -244,6 +244,7 @@ def catalog_image_fetch_urls(stored: str) -> list[str]:
             file_id = extract_drive_file_id(chunk)
             if file_id:
                 for candidate in (
+                    f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t",
                     f"https://drive.google.com/uc?export=download&id={file_id}",
                     f"https://drive.google.com/uc?export=view&id={file_id}",
                 ):

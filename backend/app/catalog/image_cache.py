@@ -99,6 +99,9 @@ def write_cached(settings: Settings, product_id: str, body: bytes, content_type:
 
 
 def _guess_mime(body: bytes, content_type: str) -> str | None:
+    head = body[:256].lstrip().lower()
+    if head.startswith(b"<!doctype") or head.startswith(b"<html") or b"<html" in head[:80]:
+        return None
     if content_type.casefold().startswith("image/"):
         return content_type.split(";")[0].strip()
     if len(body) >= 3 and body[:3] == b"\xff\xd8\xff":

@@ -75,7 +75,9 @@ def sync_catalog(db: Session, imported: list[ImportedProduct]) -> list[str]:
         product.category = category
         product.sort_order = sort_order
         product.active = True
-        product.image_url = image_url
+        incoming_image = (image_url or "").strip()
+        if incoming_image:
+            product.image_url = merge_stored_image_urls(product.image_url or "", incoming_image)
 
         for source_variant in source_variants:
             seen_variants.add(source_variant.id)
