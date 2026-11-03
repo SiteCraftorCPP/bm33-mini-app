@@ -512,6 +512,7 @@ main {
 }
 
 .product-card .product-visual.has-photo {
+  position: relative;
   display: block;
   aspect-ratio: 4 / 5;
   width: 100%;
@@ -519,6 +520,7 @@ main {
   padding: 0;
   line-height: 0;
   overflow: hidden;
+  place-items: unset;
 }
 
 .product-card .product-visual.has-photo img.product-photo {
