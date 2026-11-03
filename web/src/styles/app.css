@@ -405,6 +405,11 @@ main {
   position: relative;
 }
 
+.product-card .card-image-wrap {
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+}
+
 .card-stock-tag {
   position: absolute;
   z-index: 3;
@@ -506,21 +511,24 @@ main {
   object-position: center;
 }
 
-.product-card .product-visual:not(.has-photo) {
-  aspect-ratio: 1 / 1.12;
+.product-card .product-visual {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: unset;
   min-height: 0;
 }
 
+.product-card .product-visual:not(.has-photo) {
+  aspect-ratio: unset;
+  height: 100%;
+}
+
 .product-card .product-visual.has-photo {
-  position: relative;
+  position: absolute;
+  inset: 0;
   display: block;
-  aspect-ratio: 4 / 5;
-  width: 100%;
-  height: auto;
   padding: 0;
-  line-height: 0;
   overflow: hidden;
-  place-items: unset;
 }
 
 .product-card .product-visual.has-photo img.product-photo {
@@ -534,6 +542,16 @@ main {
   display: block;
   object-fit: cover;
   object-position: center;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.product-card .product-visual.has-photo img.product-photo.is-visible {
+  opacity: 1;
+}
+
+.product-card .product-visual.is-photo-pending {
+  background: #eef2f6;
 }
 
 .sheet-visual .product-visual.has-photo {

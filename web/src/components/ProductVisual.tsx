@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { CATEGORY_ICON_SRC, categoryIconSrc } from './categoryIcons'
 
@@ -12,26 +12,34 @@ export function ProductVisual({
   compact?: boolean
 }) {
   const tone = Object.keys(CATEGORY_ICON_SRC).indexOf(category)
-  const [failed, setFailed] = useState(false)
-  const showPhoto = Boolean(imageUrl) && !failed
+  const [photoState, setPhotoState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
+
+  useEffect(() => {
+    setPhotoState(imageUrl ? 'loading' : 'idle')
+  }, [imageUrl])
+
+  const showPhoto = photoState === 'ready'
+  const pendingPhoto = photoState === 'loading'
 
   return (
     <div
-      className={`product-visual tone-${tone % 7} ${compact ? 'is-compact' : ''} ${showPhoto ? 'has-photo' : ''}`}
+      className={`product-visual tone-${tone % 7} ${compact ? 'is-compact' : ''} ${showPhoto || pendingPhoto ? 'has-photo' : ''} ${pendingPhoto ? 'is-photo-pending' : ''}`}
     >
-      {showPhoto ? (
+      {imageUrl && photoState !== 'failed' ? (
         <img
-          className="product-photo"
+          className={`product-photo ${showPhoto ? 'is-visible' : 'is-preload'}`}
           src={imageUrl}
           alt=""
           loading="lazy"
           decoding="async"
-          onError={() => setFailed(true)}
+          onLoad={() => setPhotoState('ready')}
+          onError={() => setPhotoState('failed')}
         />
-      ) : (
+      ) : null}
+      {!showPhoto && !pendingPhoto ? (
         <img className="product-category-icon" src={categoryIconSrc(category)} alt="" />
-      )}
-      {!showPhoto && (
+      ) : null}
+      {!showPhoto && !pendingPhoto && (
         <>
           <span className="visual-glow" />
           <span className="visual-line" />

@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import io
 import re
 from pathlib import Path
 
 import httpx
-from PIL import Image, ImageOps
 
 from app.catalog.importer import catalog_image_fetch_urls, extract_drive_file_id
 from app.db import SessionLocal
@@ -51,48 +49,7 @@ def read_cached(settings: Settings, product_id: str) -> tuple[bytes, str] | None
     return data_path.read_bytes(), mime
 
 
-_CARD_ASPECT = (4, 5)
-_CARD_WIDTH = 806
-
-
-def crop_product_card_image(body: bytes, content_type: str) -> tuple[bytes, str]:
-    """Center-crop to 4:5 (same as card frame). No letterbox padding."""
-    if len(body) < 512:
-        return body, content_type
-    try:
-        img = ImageOps.exif_transpose(Image.open(io.BytesIO(body)))
-        if img.mode == "RGBA":
-            base = Image.new("RGB", img.size, (243, 246, 249))
-            base.paste(img, mask=img.split()[3])
-            img = base
-        elif img.mode != "RGB":
-            img = img.convert("RGB")
-
-        aw, ah = _CARD_ASPECT
-        target_w = _CARD_WIDTH
-        target_h = _CARD_WIDTH * ah // aw
-        src_w, src_h = img.size
-        if src_w < 8 or src_h < 8:
-            return body, content_type
-
-        scale = max(target_w / src_w, target_h / src_h)
-        resized = img.resize(
-            (max(1, round(src_w * scale)), max(1, round(src_h * scale))),
-            Image.Resampling.LANCZOS,
-        )
-        left = (resized.width - target_w) // 2
-        top = (resized.height - target_h) // 2
-        cropped = resized.crop((left, top, left + target_w, top + target_h))
-
-        out = io.BytesIO()
-        cropped.save(out, format="JPEG", quality=88, optimize=True)
-        return out.getvalue(), "image/jpeg"
-    except Exception:
-        return body, content_type
-
-
 def write_cached(settings: Settings, product_id: str, body: bytes, content_type: str) -> None:
-    body, content_type = crop_product_card_image(body, content_type)
     data_path, meta_path = cache_paths(settings, product_id)
     data_path.write_bytes(body)
     meta_path.write_text(content_type.split(";")[0].strip() or "image/jpeg", encoding="utf-8")

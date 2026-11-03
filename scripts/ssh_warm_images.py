@@ -37,9 +37,11 @@ b64 = base64.b64encode(PY.encode()).decode()
 cmd = (
     "set -e; cd /opt/bm33-mini-app && git fetch origin && git reset --hard origin/main; "
     "cd backend && ../.venv/bin/pip install -q -r requirements.txt; "
+    "cd ../web && npm ci && VITE_MANAGER_USERNAME=Ches2424 VITE_BOT_USERNAME=chesalin_hockey_bot npm run build; "
     "set -a; . /etc/ches-hockey/env; set +a; "
+    "cd /opt/bm33-mini-app/backend; "
     f"../.venv/bin/python3 -c \"import base64; exec(base64.b64decode('{b64}'))\"; "
-    "systemctl restart ches-hockey-api; sleep 5; systemctl is-active ches-hockey-api"
+    "systemctl reload nginx; systemctl restart ches-hockey-api; sleep 6; systemctl is-active ches-hockey-api"
 )
 
 client = paramiko.SSHClient()
