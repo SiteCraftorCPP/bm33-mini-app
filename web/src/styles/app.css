@@ -542,16 +542,6 @@ main {
   display: block;
   object-fit: cover;
   object-position: center;
-  opacity: 0;
-  transition: opacity 160ms ease;
-}
-
-.product-card .product-visual.has-photo img.product-photo.is-visible {
-  opacity: 1;
-}
-
-.product-card .product-visual.is-photo-pending {
-  background: #eef2f6;
 }
 
 .sheet-visual .product-visual.has-photo {
