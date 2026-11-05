@@ -289,7 +289,12 @@ def _skate_sheet_model_name(definition: SheetDefinition, raw_name: str) -> str |
     return None
 
 
-def parse_sheet(csv_text: str, definition: SheetDefinition, sort_offset: int = 0) -> list[ImportedProduct]:
+def parse_sheet(
+    csv_text: str,
+    definition: SheetDefinition,
+    sort_offset: int = 0,
+    import_warnings: list[str] | None = None,
+) -> list[ImportedProduct]:
     rows = list(csv.reader(io.StringIO(csv_text.lstrip("\ufeff"))))
     products: list[ImportedProduct] = []
     current: ImportedProduct | None = None
@@ -366,11 +371,13 @@ def parse_sheet(csv_text: str, definition: SheetDefinition, sort_offset: int = 0
             side=side,
         )
         if variant_id in seen_variants:
-            raise CatalogDataError(
-                f"Дублирующийся вариант «{previous_name} / {option1_value} / "
-                f"{option2_value} / {side}» в строках "
-                f"{seen_variants[variant_id]} и {row_number} вкладки «{definition.title}»"
-            )
+            if import_warnings is not None:
+                import_warnings.append(
+                    f"Строка {row_number} «{definition.title}»: дубликат варианта "
+                    f"«{previous_name} / {option1_value} / {option2_value} / {side}» "
+                    f"(уже строка {seen_variants[variant_id]}) — строка пропущена"
+                )
+            continue
         seen_variants[variant_id] = row_number
 
         current.variants.append(

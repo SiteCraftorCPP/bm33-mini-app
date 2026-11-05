@@ -144,18 +144,21 @@ async def force_sync(
     settings = request.app.state.settings
     if user.id not in settings.admin_id_set and not settings.demo_mode:
         raise HTTPException(status_code=403, detail="Только для администратора")
+    sheets = sheets_from(request)
     try:
-        imported = await sheets_from(request).fetch_catalog(force=True)
+        imported = await sheets.fetch_catalog(force=True)
     except SheetsError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     restocked = sync_catalog(db, imported)
     stick_warnings = stick_catalog_warnings(imported)
+    import_warnings = sheets.last_import_warnings
     schedule_warm_catalog_images(settings)
     return {
         "ok": True,
         "products": len(imported),
         "restocked": len(restocked),
         "stickWarnings": stick_warnings,
+        "importWarnings": import_warnings,
         "imageCachePending": True,
     }
 
@@ -425,12 +428,14 @@ async def admin_catalog_sync(
         ) from exc
     restocked = sync_catalog(db, imported)
     stick_warnings = stick_catalog_warnings(imported)
+    import_warnings = sheets.last_import_warnings
     schedule_warm_catalog_images(request.app.state.settings)
     return {
         "ok": True,
         "products": len(imported),
         "restocked": len(restocked),
         "stickWarnings": stick_warnings,
+        "importWarnings": import_warnings,
         "imageCachePending": True,
     }
 

@@ -39,6 +39,11 @@ class GoogleSheets:
         self._write_lock = threading.Lock()
         self._catalog_cache: list[ImportedProduct] | None = None
         self._catalog_cache_at: float = 0.0
+        self._last_import_warnings: list[str] = []
+
+    @property
+    def last_import_warnings(self) -> list[str]:
+        return list(self._last_import_warnings)
 
     @property
     def can_write(self) -> bool:
@@ -77,11 +82,17 @@ class GoogleSheets:
 
         products: list[ImportedProduct] = []
         sort_offset = 0
+        self._last_import_warnings = []
         for definition, response in zip(SHEETS, responses, strict=True):
             if response.status_code != 200:
                 raise SheetsError(f"Не удалось прочитать «{definition.title}»: HTTP {response.status_code}")
             try:
-                parsed = parse_sheet(response.text, definition, sort_offset)
+                parsed = parse_sheet(
+                    response.text,
+                    definition,
+                    sort_offset,
+                    import_warnings=self._last_import_warnings,
+                )
             except CatalogDataError as exc:
                 raise SheetsError(str(exc)) from exc
             products.extend(parsed)
@@ -148,12 +159,14 @@ class GoogleSheets:
             spreadsheet = self._spreadsheet_client()
             products: list[ImportedProduct] = []
             sort_offset = 0
+            self._last_import_warnings = []
             for definition in SHEETS:
                 worksheet = self._call_with_backoff(lambda d=definition: spreadsheet.worksheet(d.title))
                 parsed = parse_sheet(
                     self._call_with_backoff(lambda w=worksheet: self._worksheet_csv(w)),
                     definition,
                     sort_offset,
+                    import_warnings=self._last_import_warnings,
                 )
                 products.extend(parsed)
                 sort_offset += len(parsed)

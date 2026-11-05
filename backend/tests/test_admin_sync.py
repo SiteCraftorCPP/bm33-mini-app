@@ -15,6 +15,7 @@ from app.catalog.importer import demo_catalog
 
 class FakeSheets:
     can_write = True
+    last_import_warnings: list[str] = []
 
     async def fetch_catalog(self, *, force: bool = False):
         return demo_catalog()
