@@ -1,4 +1,4 @@
-import { formatGripValue } from './gripLabel'
+import { formatGripValue, sortGripSides } from './gripLabel'
 import type { CatalogFilterGroup, Product, Variant } from './types'
 
 export function formatFilterChipLabel(groupKey: string, value: string): string {
@@ -75,7 +75,7 @@ export function filterGroupsForCategory(
   }
 
   const sidePool = variantsForFilterOptions(products, category, activeFilters, 'side')
-  const sides = sortValues([...new Set(sidePool.map((variant) => variant.side).filter(Boolean))])
+  const sides = sortGripSides([...new Set(sidePool.map((variant) => variant.side).filter(Boolean))])
   if (sides.length) {
     groups.push({ key: 'side', label: 'Хват', values: sides })
   }

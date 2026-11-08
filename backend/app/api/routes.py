@@ -49,7 +49,7 @@ class CartLine(BaseModel):
 
 
 class OrderRequest(BaseModel):
-    items: list[CartLine] = Field(min_length=1, max_length=30)
+    items: list[CartLine] = Field(min_length=1, max_length=200)
     customerName: str = Field(min_length=2, max_length=160)
     phone: str = Field(min_length=5, max_length=40)
     city: str = Field(default="", max_length=120)

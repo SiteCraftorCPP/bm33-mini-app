@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Bell, Check, ChevronLeft, Minus, Plus, ShoppingBag, X } from 'lucide-react'
 import { subscribeToRestock } from '../api'
 import { pickVariantForFilters } from '../catalogFilters'
-import { formatGripValue } from '../gripLabel'
+import { formatGripValue, sortGripSides } from '../gripLabel'
 import type { Product, Variant } from '../types'
 import { ProductVisual } from './ProductVisual'
 
@@ -42,7 +42,7 @@ export function ProductSheet({
 
   const option1Values = unique(product.variants.map((variant) => variant.option1Value))
   const option2Values = unique(product.variants.map((variant) => variant.option2Value))
-  const sides = unique(product.variants.map((variant) => variant.side))
+  const sides = sortGripSides(unique(product.variants.map((variant) => variant.side)))
 
   const choose = (field: 'option1Value' | 'option2Value' | 'side', value: string) => {
     const exact = product.variants.find(
