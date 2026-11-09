@@ -12,7 +12,7 @@ from app.api.routes import router
 from app.db import Base, get_db
 from app.integrations.google_sheets import SheetsError, StockUpdate
 from app.models import Order, Product, Variant
-from app.orders.stock import fulfill_accepted_order
+from app.orders.stock import fulfill_accepted_order, restore_accepted_order_stock
 
 
 class FakeTelegram:
@@ -147,6 +147,42 @@ async def test_sheet_failure_on_accept_keeps_local_stock(api) -> None:
             await fulfill_accepted_order(db, app.state.sheets, order_id)
     with sessions() as db:
         assert db.get(Variant, "variant-1").stock == 2
+
+
+@pytest.mark.asyncio
+async def test_cancel_after_accept_restores_sheet_and_stock(api) -> None:
+    app, sessions = api
+    with TestClient(app) as client:
+        order_id = client.post("/api/orders", json=order_payload(2)).json()["id"]
+
+    with sessions() as db:
+        await fulfill_accepted_order(db, app.state.sheets, order_id)
+        db.get(Order, order_id).status = "accepted"
+        db.commit()
+
+    assert app.state.sheets.updates[0].new_stock == 0
+    with sessions() as db:
+        assert db.get(Variant, "variant-1").stock == 0
+
+    app.state.sheets.updates.clear()
+    with sessions() as db:
+        await restore_accepted_order_stock(db, app.state.sheets, order_id)
+        db.get(Order, order_id).status = "cancelled"
+        db.commit()
+
+    assert len(app.state.sheets.updates) == 1
+    assert app.state.sheets.updates[0].new_stock == 2
+    with sessions() as db:
+        assert db.get(Variant, "variant-1").stock == 2
+
+
+def test_order_rejects_more_than_500_lines(api) -> None:
+    app, _ = api
+    payload = order_payload(1)
+    payload["items"] = [{"variantId": "variant-1", "quantity": 1} for _ in range(501)]
+    with TestClient(app) as client:
+        response = client.post("/api/orders", json=payload)
+    assert response.status_code == 422
 
 
 def test_browser_demo_order_does_not_write_real_sheet(api) -> None:
