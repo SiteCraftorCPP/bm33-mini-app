@@ -16,7 +16,15 @@ from aiogram.types import (
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.bot.order_messages import format_order_text, order_action_markup, user_accepted_markup
+from app.bot.order_messages import (
+    format_order_edit_header,
+    format_order_text,
+    order_action_markup,
+    order_edit_item_markup,
+    order_edit_list_markup,
+    user_accepted_markup,
+)
+from app.orders.edit import OrderEditError, change_order_item_quantity, remove_order_item
 from app.config import Settings
 from app.db import SessionLocal
 from app.integrations.google_sheets import GoogleSheets, SheetsError
@@ -83,6 +91,108 @@ class TelegramService:
                 await call.message.answer("📲 Перейдите в чат с менеджером:", reply_markup=markup)
             elif call.message:
                 await call.message.answer("Контакт менеджера пока не настроен.")
+
+        @router.callback_query(F.data.startswith("oed:"))
+        async def edit_order(call: CallbackQuery) -> None:
+            if call.from_user.id not in self.settings.admin_id_set:
+                await call.answer("Нет доступа", show_alert=True)
+                return
+            parts = call.data.split(":")
+            if len(parts) < 3 or parts[0] != "oed" or not parts[1].isdigit():
+                await call.answer()
+                return
+            order_id = int(parts[1])
+            action = parts[2]
+            item_id: int | None = None
+            if len(parts) >= 4 and parts[3].isdigit():
+                item_id = int(parts[3])
+
+            with SessionLocal() as db:
+                order = db.scalar(
+                    select(Order).where(Order.id == order_id).options(selectinload(Order.items))
+                )
+                if order is None:
+                    await call.answer("Заказ не найден", show_alert=True)
+                    return
+
+                try:
+                    if action in {"p", "d"} and item_id is not None:
+                        delta = 1 if action == "p" else -1
+                        order = change_order_item_quantity(
+                            db,
+                            order_id=order_id,
+                            item_id=item_id,
+                            delta=delta,
+                        )
+                        await call.answer("Количество обновлено")
+                    elif action == "x" and item_id is not None:
+                        order = remove_order_item(db, order_id=order_id, item_id=item_id)
+                        await call.answer("Позиция удалена")
+                    elif action not in {"list", "done", "i"}:
+                        await call.answer()
+                        return
+                    else:
+                        await call.answer()
+                except OrderEditError as exc:
+                    await call.answer(str(exc), show_alert=True)
+                    return
+
+                if order is None:
+                    return
+                user_id = order.telegram_user_id
+
+            if not call.message or not self.bot or order is None:
+                return
+
+            try:
+                if action == "done":
+                    text = format_order_text(order)
+                    markup = order_action_markup(
+                        order_id,
+                        order.status,
+                        self.settings.webapp_base_url,
+                    )
+                elif action == "i" and item_id is not None:
+                    item = next((i for i in order.items if i.id == item_id), None)
+                    if item is None:
+                        text = format_order_edit_header(order)
+                        markup = order_edit_list_markup(order)
+                    else:
+                        text = (
+                            f"{format_order_edit_header(order)}\n\n"
+                            f"{item.product_name}\n{item.variant_label}\n"
+                            f"Количество: {item.quantity} × {item.unit_price:,} ₽".replace(",", " ")
+                        )
+                        markup = order_edit_item_markup(order_id, item_id)
+                else:
+                    text = format_order_edit_header(order)
+                    markup = order_edit_list_markup(order)
+                    if action in {"p", "d", "x"} and item_id is not None:
+                        item = next((i for i in order.items if i.id == item_id), None)
+                        if item and action != "x":
+                            text = (
+                                f"{format_order_edit_header(order)}\n\n"
+                                f"{item.product_name}\n{item.variant_label}\n"
+                                f"Количество: {item.quantity} × {item.unit_price:,} ₽".replace(",", " ")
+                            )
+                            markup = order_edit_item_markup(order_id, item_id)
+                await call.message.edit_text(text, reply_markup=markup)
+            except Exception:
+                self.log.exception("order edit card failed")
+
+            if action in {"p", "d", "x"}:
+                try:
+                    await self.bot.send_message(
+                        user_id,
+                        f"Менеджер обновил состав заказа №{order_id}. "
+                        f"Итого: {order.total:,} ₽".replace(",", " "),
+                        reply_markup=user_accepted_markup(
+                            order_id,
+                            self.settings.webapp_base_url,
+                        ),
+                    )
+                except Exception:
+                    self.log.exception("order edit user notify failed", extra={"order_id": order_id})
 
         @router.callback_query(F.data.startswith("order:"))
         async def update_order(call: CallbackQuery) -> None:

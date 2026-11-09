@@ -31,8 +31,9 @@ def test_order_markup_hides_buttons_after_accept() -> None:
     assert order_action_markup(1, "cancelled", "https://x.ru") is None
     contacted = order_action_markup(1, "contacted", "https://x.ru")
     assert contacted is not None
-    assert len(contacted.inline_keyboard) == 2
+    assert len(contacted.inline_keyboard) == 3
+    assert "Состав" in contacted.inline_keyboard[1][0].text
     new = order_action_markup(1, "new", "https://x.ru")
     assert new is not None
-    assert len(new.inline_keyboard) == 2
-    assert "Отменить" in new.inline_keyboard[1][0].text
+    assert len(new.inline_keyboard) == 3
+    assert "Отменить" in new.inline_keyboard[2][0].text

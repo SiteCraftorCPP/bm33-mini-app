@@ -48,9 +48,63 @@ def format_order_text(order: Order) -> str:
     return "\n".join(lines)
 
 
+def _item_button_label(item) -> str:
+    name = item.product_name
+    if len(name) > 22:
+        name = f"{name[:20]}…"
+    return f"{name} ×{item.quantity}"
+
+
+def format_order_edit_header(order: Order) -> str:
+    lines = [
+        f"✏️ Состав заказа №{order.id}",
+        f"Итого: {order.total:,} ₽".replace(",", " "),
+        "",
+        "Выберите позицию:",
+    ]
+    return "\n".join(lines)
+
+
+def order_edit_list_markup(order: Order) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    for item in order.items:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=_item_button_label(item),
+                    callback_data=f"oed:{order.id}:i:{item.id}",
+                )
+            ]
+        )
+    rows.append(
+        [InlineKeyboardButton(text="← К заказу", callback_data=f"oed:{order.id}:done")]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def order_edit_item_markup(order_id: int, item_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="−1", callback_data=f"oed:{order_id}:d:{item_id}"),
+                InlineKeyboardButton(text="+1", callback_data=f"oed:{order_id}:p:{item_id}"),
+            ],
+            [
+                InlineKeyboardButton(text="🗑 Удалить позицию", callback_data=f"oed:{order_id}:x:{item_id}"),
+            ],
+            [
+                InlineKeyboardButton(text="← К списку", callback_data=f"oed:{order_id}:list"),
+            ],
+        ]
+    )
+
+
 def order_action_markup(order_id: int, status: str, webapp_url: str) -> InlineKeyboardMarkup | None:
     if status in {"accepted", "cancelled"}:
         return None
+    edit_row = [
+        InlineKeyboardButton(text="✏️ Состав", callback_data=f"oed:{order_id}:list"),
+    ]
     cancel_row = [
         InlineKeyboardButton(text="❌ Отменить", callback_data=f"order:{order_id}:cancelled"),
     ]
@@ -63,6 +117,7 @@ def order_action_markup(order_id: int, status: str, webapp_url: str) -> InlineKe
                         callback_data=f"order:{order_id}:accepted",
                     ),
                 ],
+                edit_row,
                 cancel_row,
             ]
         )
@@ -72,6 +127,7 @@ def order_action_markup(order_id: int, status: str, webapp_url: str) -> InlineKe
                 InlineKeyboardButton(text="✅ Принять", callback_data=f"order:{order_id}:accepted"),
                 InlineKeyboardButton(text="📞 Связались", callback_data=f"order:{order_id}:contacted"),
             ],
+            edit_row,
             cancel_row,
         ]
     )
