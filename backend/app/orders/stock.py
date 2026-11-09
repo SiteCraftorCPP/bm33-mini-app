@@ -144,3 +144,28 @@ async def restore_accepted_order_stock(
 
     for variant_id, quantity in quantities.items():
         by_id[variant_id].stock += quantity
+
+
+async def apply_stock_delta(
+    db: Session,
+    sheets: GoogleSheets,
+    variant: Variant,
+    delta: int,
+    *,
+    demo: bool = False,
+) -> None:
+    """delta > 0 — вернуть на склад (таблица + БД), delta < 0 — списать."""
+    if delta == 0:
+        return
+    new_stock = variant.stock + delta
+    if new_stock < 0:
+        raise SheetsError(f"Недостаточно остатка (сейчас {variant.stock} шт.)")
+
+    if variant.sheet_gid == "demo":
+        variant.stock = new_stock
+        return
+
+    update = _stock_update(variant, variant.stock, new_stock)
+    if not demo:
+        await sheets.update_stocks([update])
+    variant.stock = new_stock
