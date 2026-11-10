@@ -43,6 +43,7 @@ import {
 } from './api'
 import { filterGroupsForCategory, formatFilterChipLabel, productMatchesFilters, sanitizeCategoryFilters } from './catalogFilters'
 import { formatVariantLabel } from './gripLabel'
+import { normalizePhone } from './phone'
 import { formatModelCount } from './pluralRu'
 import { CategoryIcon } from './components/CategoryIcon'
 import { ProductCard } from './components/ProductCard'
@@ -209,10 +210,14 @@ function App() {
     setError('')
     setSubmitting(true)
     try {
+      let orderCheckout = checkout
+      if (!offline) {
+        orderCheckout = { ...checkout, phone: normalizePhone(checkout.phone) }
+      }
       const result = offline
         ? { id: Math.floor(1000 + Math.random() * 9000), status: 'new', total: cartTotal }
         : await createOrder(
-            checkout,
+            orderCheckout,
             cart.map((line) => ({ variantId: line.variant.id, quantity: line.quantity })),
           )
       setOrderId(result.id)
@@ -701,7 +706,8 @@ function CheckoutView({
         <div className="form-card">
           <h3><span>01</span> Контакты</h3>
           <label><CircleUserRound size={18} /><span><small>Ваше имя</small><input required minLength={2} value={data.customerName} onChange={(e) => update('customerName', e.target.value)} placeholder="Александр" /></span></label>
-          <label><Phone size={18} /><span><small>Телефон</small><input required minLength={5} value={data.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+7 999 000-00-00" inputMode="tel" /></span></label>
+          <label><Phone size={18} /><span><small>Телефон</small><input required minLength={11} value={data.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+7 999 000 00 00" inputMode="tel" autoComplete="tel" /></span></label>
+          <p className="form-note" style={{ marginTop: '-4px' }}>Укажите все 11 цифр с кодом +7</p>
           <label><MapPin size={18} /><span><small>Город</small><input value={data.city} onChange={(e) => update('city', e.target.value)} placeholder="Москва" /></span></label>
         </div>
         <div className="form-card">

@@ -14,6 +14,9 @@ from app.models import Product, PromoCode, Variant
 
 
 class FakeTelegram:
+    async def refresh_order_client_profile(self, order_id: int) -> None:
+        return None
+
     async def notify_order(self, order_id: int) -> None:
         return None
 

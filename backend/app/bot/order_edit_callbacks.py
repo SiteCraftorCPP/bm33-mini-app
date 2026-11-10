@@ -117,6 +117,8 @@ async def handle_order_edit_callback(service: TelegramService, call: CallbackQue
                     order_id,
                     order.status,
                     service.settings.webapp_base_url,
+                    telegram_user_id=order.telegram_user_id,
+                    telegram_username=order.telegram_username,
                 )
         elif action == "xd" and item_id is not None:
             item = next((i for i in order.items if i.id == item_id), None)

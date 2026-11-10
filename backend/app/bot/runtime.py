@@ -150,6 +150,8 @@ class TelegramService:
                         order_id,
                         order.status,
                         self.settings.webapp_base_url,
+                        telegram_user_id=order.telegram_user_id,
+                        telegram_username=order.telegram_username,
                     )
                     if call.message:
                         await call.message.edit_text(card_text, reply_markup=markup)
@@ -211,9 +213,31 @@ class TelegramService:
         if self.bot:
             await self.bot.session.close()
 
+    async def refresh_order_client_profile(self, order_id: int) -> None:
+        if self.bot is None:
+            return
+        with SessionLocal() as db:
+            order = db.get(Order, order_id)
+            if order is None:
+                return
+            user_id = order.telegram_user_id
+        try:
+            chat = await self.bot.get_chat(user_id)
+            username = (chat.username or "").strip()
+            if not username:
+                return
+            with SessionLocal() as db:
+                order = db.get(Order, order_id)
+                if order and order.telegram_username != username:
+                    order.telegram_username = username
+                    db.commit()
+        except Exception:
+            self.log.exception("client profile refresh failed", extra={"order_id": order_id})
+
     async def notify_order(self, order_id: int) -> None:
         if self.bot is None:
             return
+        await self.refresh_order_client_profile(order_id)
         with SessionLocal() as db:
             order = db.scalar(
                 select(Order).where(Order.id == order_id).options(selectinload(Order.items))
@@ -225,6 +249,8 @@ class TelegramService:
                 order_id,
                 order.status,
                 self.settings.webapp_base_url,
+                telegram_user_id=order.telegram_user_id,
+                telegram_username=order.telegram_username,
             )
         for chat_id in self.target_chat_ids:
             await self.bot.send_message(chat_id, text, reply_markup=markup)
@@ -244,6 +270,8 @@ class TelegramService:
                 order_id,
                 order.status,
                 self.settings.webapp_base_url,
+                telegram_user_id=order.telegram_user_id,
+                telegram_username=order.telegram_username,
             )
         for chat_id in self.target_chat_ids:
             await self.bot.send_message(chat_id, text, reply_markup=markup)

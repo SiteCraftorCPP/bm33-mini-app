@@ -18,6 +18,7 @@ from app.db import get_db
 from app.integrations.google_sheets import GoogleSheets, SheetsError
 from app.models import PromoCode
 from app.orders.status import OrderStatusError, cancel_order_by_customer
+from app.phone import PhoneError, normalize_phone
 from app.orders.stock import available_units
 from app.promos.service import PromoError, apply_promo, normalize_code, preview_promo, promo_to_dict
 from app.models import Order, OrderItem, Product, RestockSubscription, Variant
@@ -208,11 +209,18 @@ async def create_order(
         except PromoError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     total = max(subtotal - discount, 0)
+    if demo_order:
+        phone = payload.phone.strip()
+    else:
+        try:
+            phone = normalize_phone(payload.phone)
+        except PhoneError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     order = Order(
         telegram_user_id=user.id,
         telegram_username=user.username,
         customer_name=payload.customerName.strip(),
-        phone=payload.phone.strip(),
+        phone=phone,
         city=payload.city.strip(),
         delivery=payload.delivery.strip(),
         comment=payload.comment.strip(),
@@ -240,6 +248,7 @@ async def create_order(
         raise HTTPException(status_code=500, detail="Не удалось сохранить заказ")
 
     try:
+        await request.app.state.telegram.refresh_order_client_profile(order.id)
         await request.app.state.telegram.notify_order(order.id)
     except Exception:
         request.app.state.logger.exception("order notification failed", extra={"order_id": order.id})

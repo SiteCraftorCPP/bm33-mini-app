@@ -5,6 +5,7 @@ import math
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from app.models import Order
+from app.phone import format_phone_display
 
 EDIT_PAGE_SIZE = 8
 
@@ -42,7 +43,7 @@ def format_order_text(order: Order) -> str:
     lines.extend(
         [
             f"Клиент: {order.customer_name}",
-            f"Телефон: {order.phone}",
+            f"Телефон: {format_phone_display(order.phone)}",
             f"Город: {order.city or 'не указан'}",
             f"Получение: {order.delivery or 'уточнить'}",
         ]
@@ -50,7 +51,9 @@ def format_order_text(order: Order) -> str:
     if order.telegram_username:
         lines.append(f"Telegram: @{order.telegram_username}")
     else:
-        lines.append(f"Telegram ID: {order.telegram_user_id}")
+        lines.append(
+            f"Telegram: без @username (ID {order.telegram_user_id}) - кнопка «Написать клиенту»"
+        )
     if order.comment:
         lines.append(f"Комментарий: {order.comment}")
     return "\n".join(lines)
@@ -203,20 +206,46 @@ def format_order_edit_confirm_remove(order: Order, item) -> str:
     )
 
 
-def order_action_markup(order_id: int, status: str, webapp_url: str) -> InlineKeyboardMarkup | None:
+def _client_contact_row(telegram_user_id: int, telegram_username: str) -> list[InlineKeyboardButton]:
+    if telegram_user_id <= 0:
+        return []
+    if telegram_username:
+        handle = telegram_username.strip().lstrip("@")
+        url = f"https://t.me/{handle}"
+    else:
+        url = f"tg://user?id={telegram_user_id}"
+    return [InlineKeyboardButton(text="💬 Написать клиенту", url=url)]
+
+
+def order_action_markup(
+    order_id: int,
+    status: str,
+    webapp_url: str,
+    *,
+    telegram_user_id: int = 0,
+    telegram_username: str = "",
+) -> InlineKeyboardMarkup | None:
     if status == "cancelled":
         return None
     if status == "accepted":
-        return order_action_markup_accepted_edit(order_id)
+        return order_action_markup_accepted_edit(
+            order_id,
+            telegram_user_id=telegram_user_id,
+            telegram_username=telegram_username,
+        )
+    client_row = _client_contact_row(telegram_user_id, telegram_username)
     edit_row = [
         InlineKeyboardButton(text="✏️ Состав", callback_data=f"oed:{order_id}:list:0"),
     ]
     cancel_row = [
         InlineKeyboardButton(text="❌ Отменить", callback_data=f"order:{order_id}:cancelled"),
     ]
+    rows: list[list[InlineKeyboardButton]] = []
+    if client_row:
+        rows.append(client_row)
     if status == "contacted":
-        return InlineKeyboardMarkup(
-            inline_keyboard=[
+        rows.extend(
+            [
                 [
                     InlineKeyboardButton(
                         text="✅ Принять",
@@ -227,27 +256,37 @@ def order_action_markup(order_id: int, status: str, webapp_url: str) -> InlineKe
                 cancel_row,
             ]
         )
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+    else:
+        rows.extend(
             [
-                InlineKeyboardButton(text="✅ Принять", callback_data=f"order:{order_id}:accepted"),
-                InlineKeyboardButton(text="📞 Связались", callback_data=f"order:{order_id}:contacted"),
-            ],
-            edit_row,
-            cancel_row,
-        ]
-    )
+                [
+                    InlineKeyboardButton(text="✅ Принять", callback_data=f"order:{order_id}:accepted"),
+                    InlineKeyboardButton(text="📞 Связались", callback_data=f"order:{order_id}:contacted"),
+                ],
+                edit_row,
+                cancel_row,
+            ]
+        )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def order_action_markup_accepted_edit(order_id: int) -> InlineKeyboardMarkup:
+def order_action_markup_accepted_edit(
+    order_id: int,
+    *,
+    telegram_user_id: int = 0,
+    telegram_username: str = "",
+) -> InlineKeyboardMarkup:
     """Карточка принятого заказа: правка состава (возврат в таблицу при уменьшении)."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="✏️ Состав", callback_data=f"oed:{order_id}:list:0"),
-            ],
+    rows: list[list[InlineKeyboardButton]] = []
+    client_row = _client_contact_row(telegram_user_id, telegram_username)
+    if client_row:
+        rows.append(client_row)
+    rows.append(
+        [
+            InlineKeyboardButton(text="✏️ Состав", callback_data=f"oed:{order_id}:list:0"),
         ]
     )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def user_order_markup(order_id: int, webapp_url: str) -> InlineKeyboardMarkup:

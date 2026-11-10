@@ -1,4 +1,4 @@
-from app.bot.order_messages import format_order_text, order_action_markup
+from app.bot.order_messages import _client_contact_row, format_order_text, order_action_markup
 from app.models import Order, OrderItem
 
 
@@ -27,15 +27,25 @@ def test_format_order_text_uses_dashes_not_bullets() -> None:
 
 
 def test_order_markup_hides_buttons_after_accept() -> None:
-    accepted = order_action_markup(1, "accepted", "https://x.ru")
+    accepted = order_action_markup(
+        1, "accepted", "https://x.ru", telegram_user_id=42, telegram_username=""
+    )
     assert accepted is not None
-    assert "Состав" in accepted.inline_keyboard[0][0].text
+    assert accepted.inline_keyboard[0][0].text == "💬 Написать клиенту"
+    assert accepted.inline_keyboard[0][0].url == "tg://user?id=42"
+    assert "Состав" in accepted.inline_keyboard[1][0].text
     assert order_action_markup(1, "cancelled", "https://x.ru") is None
-    contacted = order_action_markup(1, "contacted", "https://x.ru")
+    contacted = order_action_markup(
+        1, "contacted", "https://x.ru", telegram_user_id=1, telegram_username="client"
+    )
     assert contacted is not None
-    assert len(contacted.inline_keyboard) == 3
-    assert "Состав" in contacted.inline_keyboard[1][0].text
-    new = order_action_markup(1, "new", "https://x.ru")
+    assert len(contacted.inline_keyboard) == 4
+    assert contacted.inline_keyboard[0][0].url == "https://t.me/client"
+    new = order_action_markup(1, "new", "https://x.ru", telegram_user_id=5)
     assert new is not None
-    assert len(new.inline_keyboard) == 3
-    assert "Отменить" in new.inline_keyboard[2][0].text
+    assert len(new.inline_keyboard) == 4
+
+
+def test_client_contact_row_username() -> None:
+    row = _client_contact_row(1, "makar")
+    assert row[0].url == "https://t.me/makar"

@@ -19,6 +19,9 @@ class FakeTelegram:
     def __init__(self) -> None:
         self.orders: list[int] = []
 
+    async def refresh_order_client_profile(self, order_id: int) -> None:
+        pass
+
     async def notify_order(self, order_id: int) -> None:
         self.orders.append(order_id)
 
