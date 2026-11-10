@@ -50,6 +50,39 @@ describe('ProductSheet', () => {
     expect(onAdd.mock.calls[0][2]).toBe(2)
   })
 
+  it('keeps size when color has no matching variant', () => {
+    const sizedProduct: Product = {
+      ...product,
+      variants: [
+        {
+          ...product.variants[0],
+          id: 'w11',
+          option1Name: 'Размер',
+          option1Value: '11',
+          option2Name: 'Цвет',
+          option2Value: 'белый',
+          label: '11 / белый',
+        },
+        {
+          ...product.variants[0],
+          id: 'b12',
+          option1Name: 'Размер',
+          option1Value: '12',
+          option2Name: 'Цвет',
+          option2Value: 'чёрный',
+          label: '12 / чёрный',
+        },
+      ],
+    }
+    render(<ProductSheet product={sizedProduct} onClose={vi.fn()} onAdd={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '11' }))
+    fireEvent.click(screen.getByRole('button', { name: 'чёрный' }))
+
+    expect(screen.getByRole('button', { name: '11' })).toHaveClass('is-selected')
+    expect(screen.getByText('Нет такой комбинации')).toBeInTheDocument()
+  })
+
   it('shows restock action for an unavailable variant', () => {
     render(<ProductSheet product={{ ...product, variants: [product.variants[1]], stock: 0 }} onClose={vi.fn()} onAdd={vi.fn()} />)
 

@@ -10,6 +10,32 @@ const money = new Intl.NumberFormat('ru-RU')
 
 const unique = (items: string[]) => [...new Set(items.filter(Boolean))]
 
+type OptionPicks = {
+  option1Value: string
+  option2Value: string
+  side: string
+}
+
+function picksFromVariant(variant: Variant | undefined): OptionPicks {
+  if (!variant) {
+    return { option1Value: '', option2Value: '', side: '' }
+  }
+  return {
+    option1Value: variant.option1Value,
+    option2Value: variant.option2Value,
+    side: variant.side,
+  }
+}
+
+export function resolveVariantByPicks(product: Product, picks: OptionPicks): Variant | undefined {
+  return product.variants.find((variant) => {
+    if (picks.option1Value && variant.option1Value !== picks.option1Value) return false
+    if (picks.option2Value && variant.option2Value !== picks.option2Value) return false
+    if (picks.side && variant.side !== picks.side) return false
+    return true
+  })
+}
+
 export function ProductSheet({
   product,
   preferredFilters,
@@ -28,31 +54,30 @@ export function ProductSheet({
     }
     return product.variants.find((variant) => variant.stock > 0) ?? product.variants[0]
   }, [product, preferredFilters])
-  const [selected, setSelected] = useState<Variant | undefined>(firstVariant)
+  const [picks, setPicks] = useState<OptionPicks>(() => picksFromVariant(firstVariant))
   const [quantity, setQuantity] = useState(1)
   const [subscribed, setSubscribed] = useState(false)
 
+  const selected = useMemo(() => {
+    if (!product) return undefined
+    return resolveVariantByPicks(product, picks)
+  }, [product, picks])
+
   useEffect(() => {
-    setSelected(firstVariant)
+    setPicks(picksFromVariant(firstVariant))
     setQuantity(1)
     setSubscribed(false)
   }, [firstVariant, product])
 
-  if (!product || !selected) return null
+  if (!product) return null
 
+  const variantTemplate = product.variants[0]
   const option1Values = unique(product.variants.map((variant) => variant.option1Value))
   const option2Values = unique(product.variants.map((variant) => variant.option2Value))
   const sides = sortGripSides(unique(product.variants.map((variant) => variant.side)))
 
   const choose = (field: 'option1Value' | 'option2Value' | 'side', value: string) => {
-    const exact = product.variants.find(
-      (variant) =>
-        variant[field] === value &&
-        (field === 'option1Value' || !selected.option1Value || variant.option1Value === selected.option1Value) &&
-        (field === 'option2Value' || !selected.option2Value || variant.option2Value === selected.option2Value) &&
-        (field === 'side' || !selected.side || variant.side === selected.side),
-    )
-    setSelected(exact ?? product.variants.find((variant) => variant[field] === value) ?? selected)
+    setPicks((current) => ({ ...current, [field]: value }))
     setQuantity(1)
   }
 
@@ -68,16 +93,26 @@ export function ProductSheet({
       <div className="option-group">
         <div className="option-label">
           <span>{title}</span>
-          <strong>{displayOptionValue(field, selected[field])}</strong>
+          <strong>{displayOptionValue(field, picks[field])}</strong>
         </div>
         <div className="option-pills">
           {values.map((value) => {
-            const candidates = product.variants.filter((variant) => variant[field] === value)
-            const available = candidates.some((variant) => variant.stock > 0)
+            const matchesOtherPicks = (variant: Variant) => {
+              if (variant[field] !== value) return false
+              if (field !== 'option1Value' && picks.option1Value && variant.option1Value !== picks.option1Value) {
+                return false
+              }
+              if (field !== 'option2Value' && picks.option2Value && variant.option2Value !== picks.option2Value) {
+                return false
+              }
+              if (field !== 'side' && picks.side && variant.side !== picks.side) return false
+              return true
+            }
+            const available = product.variants.filter(matchesOtherPicks).some((variant) => variant.stock > 0)
             return (
               <button
                 key={value}
-                className={`${selected[field] === value ? 'is-selected' : ''} ${available ? '' : 'is-unavailable'}`}
+                className={`${picks[field] === value ? 'is-selected' : ''} ${available ? '' : 'is-unavailable'}`}
                 onClick={() => choose(field, value)}
               >
                 {displayOptionValue(field, value)}
@@ -89,6 +124,7 @@ export function ProductSheet({
     )
 
   const subscribe = async () => {
+    if (!selected) return
     try {
       await subscribeToRestock(selected.id)
       setSubscribed(true)
@@ -115,30 +151,38 @@ export function ProductSheet({
         <div className="sheet-content">
           <span className="eyebrow">{product.category}</span>
           <h2>{product.name.replace(/\s[LR](?=\s|$)/, '')}</h2>
-          <div className="sheet-price">{money.format(selected.price)} ₽</div>
+          <div className="sheet-price">{money.format(selected?.price ?? product.minPrice)} ₽</div>
           <p className="sheet-description">
             Профессиональная экипировка в наличии. Проверяем каждый товар перед отправкой.
           </p>
 
-          {optionGroup(selected.option1Name || 'Вариант', option1Values, 'option1Value')}
-          {optionGroup(selected.option2Name || 'Параметр', option2Values, 'option2Value')}
+          {optionGroup(variantTemplate.option1Name || 'Вариант', option1Values, 'option1Value')}
+          {optionGroup(variantTemplate.option2Name || 'Параметр', option2Values, 'option2Value')}
           {optionGroup('Хват', sides, 'side')}
 
-          <div className={`availability-card ${selected.stock ? '' : 'is-empty'}`}>
-            <span>{selected.stock ? <Check size={16} /> : <Bell size={16} />}</span>
+          <div className={`availability-card ${selected?.stock ? '' : 'is-empty'}`}>
+            <span>{selected?.stock ? <Check size={16} /> : <Bell size={16} />}</span>
             <div>
-              <strong>{selected.stock ? 'Можно заказывать' : 'Сейчас нет в наличии'}</strong>
+              <strong>
+                {!selected
+                  ? 'Нет такой комбинации'
+                  : selected.stock
+                    ? 'Можно заказывать'
+                    : 'Сейчас нет в наличии'}
+              </strong>
               <small>
-                {selected.stock
-                  ? `На складе ${selected.stock} шт.`
-                  : 'Нажмите кнопку ниже — пришлём уведомление в Telegram, когда вариант снова будет в наличии'}
+                {!selected
+                  ? 'Выберите другие параметры'
+                  : selected.stock
+                    ? `На складе ${selected.stock} шт.`
+                    : 'Нажмите кнопку ниже — пришлём уведомление в Telegram, когда вариант снова будет в наличии'}
               </small>
             </div>
           </div>
         </div>
 
         <footer className="sheet-action">
-          {selected.stock > 0 ? (
+          {selected && selected.stock > 0 ? (
             <>
               <div className="qty-control">
                 <button aria-label="Уменьшить количество" onClick={() => setQuantity(Math.max(1, quantity - 1))}><Minus size={16} /></button>
@@ -155,12 +199,12 @@ export function ProductSheet({
                 <ShoppingBag size={18} /> В корзину
               </button>
             </>
-          ) : (
+          ) : selected ? (
             <button className="primary-button grow secondary" onClick={subscribe} disabled={subscribed}>
               {subscribed ? <Check size={18} /> : <Bell size={18} />}
               {subscribed ? 'Напишем в Telegram' : 'Сообщить в Telegram'}
             </button>
-          )}
+          ) : null}
         </footer>
       </section>
     </div>
